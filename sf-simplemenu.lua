@@ -2,9 +2,7 @@
 --@author dobriyprop
 --@client
 
-local inputENUM = {} --table of ENUMs to unify keyboard and mouse input codes
-
-setmetatable(inputENUM,KEY) --set metatable to KEY ENUMs table
+local inputENUM = table.copy(KEY) --table of ENUMs to unify keyboard and mouse input codes
 
 --define mouse input codes
 inputENUM.MOUSE1 = MOUSE.MOUSE1
@@ -28,7 +26,7 @@ local SimpleMenu = {
     root = nil,
 }
 
-local menuInputENUM = {
+local menuInputENUM = { --ENUMs for menu actions
     up = 1,
     down = 2,
     left = 3,
@@ -37,7 +35,7 @@ local menuInputENUM = {
     back = 6,
 }
 
-local menuInputs = {
+local menuInputs = { --inputs map
     [inputENUM.W] = menuInputENUM.up,
     [inputENUM.S] = menuInputENUM.down,
     [inputENUM.A] = menuInputENUM.left,
