@@ -13,21 +13,6 @@ inputENUM.MOUSE5 = MOUSE.MOUSE5
 inputENUM.MWHEELUP = MOUSE.MWHEELUP
 inputENUM.MWHEELDOWN = MOUSE.MWHEELDOWN
 
-local SimpleMenu = {
-    cursor = 1,
-    menuStack = {},
-    inputStack = {},
-
-    classes = {},
-
-    font = render.getDefaultFont(),
-    minwidth = 200,
-    marginx = 0,
-    marginy = 0,
-
-    root = nil,
-}
-
 local menuInputENUM = { --ENUMs for menu actions
     up = 1,
     down = 2,
@@ -53,14 +38,39 @@ local menuInputs = { --inputs map
 }
 
 local COLORS = {
-    black = Color(0, 0, 0),
-    white = Color(255, 255, 255),
+    cursor = Color(0, 0, 0),
+    elementActive = Color(0, 0, 0),
+    text = Color(255, 255, 255),
+    textActive = Color(0, 0, 0),
     background = Color(0, 0, 0, 150),
 }
 
+local SimpleMenu = {
+    classes = {},
+    font = render.getDefaultFont(),
+
+    cursor = 1,
+    menuStack = {},
+    inputStack = {},
+    root = nil,
+
+    scrX = 0,
+    scrY = 0,
+    scrCenterX = 0,
+    scrCenterY = 0,
+    windowPosX = 0,
+    windowPosY = 0,
+    windowMarginX = 0,
+    windowMarginY = 0,
+    windowMinWidth = 200,
+    rowHeight = 0,
+}
+
 function assertType(value, valueName, expectedType)
-    assert(type(value) == "string", valueName .. " value should be \"" .. expectedType .. "\", not \"" ..
-        type(value) .. "\"")
+    assert(
+        type(value) == "string",
+        valueName .. " value should be \"" .. expectedType .. "\", not \"" .. type(value) .. "\""
+    )
 end
 
 function SimpleMenu:setFont(font)
@@ -75,13 +85,13 @@ end
 
 function SimpleMenu:setMinWidth(minWidth)
     assertType(minWidth, "Minimal Width", "number")
-    self.minwidth = minWidth
+    self.windowMinWidth = minWidth
 end
 
 function SimpleMenu:setWindowMargins(x, y)
     assertType(x, "Window Margin X", "number")
     assertType(y, "Window Margin Y", "number")
-    self.marginx, self.marginy = x, y
+    self.windowMarginX, self.windowMarginY = x, y
 end
 
 function SimpleMenu:assertClass(Name)
@@ -92,7 +102,7 @@ function SimpleMenu:registerClass(Name, ParentName)
     assertType(Name, "Name", "string")
 
     if ParentName ~= nil then
-        assertType(value, "Name", expectedType)
+        assertType(ParentName, "Parent Name", "string")
         assert(self.classes[ParentName] == nil, "Class \"" .. ParentName .. "\" does not exists")
 
         self.classes[Name] = class(Name, self.classes[ParentName])
@@ -103,35 +113,139 @@ function SimpleMenu:registerClass(Name, ParentName)
     return self.classes[Name]
 end
 
+function SimpleMenu:createElement(class, parentMenu)
+    assertType(class, "Class", "string")
+
+    if class == "Menu" then
+        return self.registry[class]:new()
+    elseif not parentMenu then
+        assertType(class, "Parent Menu", "table")
+        return self.registry[class]:new()
+    end
+end
+
+function SimpleMenu:InitDisplay()
+    scrX, scrY = render.getGameResolution()
+    centerX, centerY = srcx * 0.5, srcy * 0.5
+
+    self.scrX, self.scrY, self.scrCenterX, self.scrCenterY = scrX, scrY, centerX, centerY
+end
+
+function SimpleMenu:Render()
+    local currentMenu = self.menuStack[#self.menuStack]
+
+    _, self.fontHeight = render.getTextSize("TEST")
+    self.windowHeight = (fontHeight + rowPadding) * #currentMenu
+    self.rowHeight = self.fontHeight + self.windowHeight
+    self.windowWidth = self.windowMinWidth
+    self.windowPosX = self.srcCenterPosX - self.windowMinWidth * 0.5
+    self.windowPosY = self.srcCenterPosX - self.windowHeight * 0.5
+
+    render.setColor(COLORS.background)
+    render.drawRect(
+        self.windowPosX - self.windowMarginX,
+        self.windowPosY - self.windowMarginY,
+        self.windowWidth + self.windowMarginX * 2,
+        self.windowHeight + self.windowMarginX * 2
+    )
+
+    render.setColor(COLORS.cursor)
+    render.drawRect(
+        self.windowPosX - self.windowMarginX,
+        self.windowPosY + self.rowHeight * (self.cursor - 1),
+        self.windowWidth + self.windowMarginX * 2,
+        self.rowHeight
+    )
+
+    for i, Element in ipairs(CurrentMenu) do
+        Element:Render(i)
+    end
+end
+
+function SimpleMenu:Open()
+    self:InitDisplay()
+
+    self.cursor = 1
+    self.menuStack = { self.root }
+
+    hook.add("drawhud", "SimpleMenu Render", function()
+        self:Render()
+    end)
+
+    hook.add("inputPressed", "SimpleMenu Input Read", function(key)
+        if self.inputStack and not table.isEmpty(self.inputStack) then
+            self.inputStack[#self.inputStack](key)
+        end
+    end)
+end
+
+function SimpleMenu:Close()
+    hook.remove("drawhud", "SimpleMenu Render")
+    hook.remove("inputPressed", "SimpleMenu Input Read")
+end
+
 --classes
 --Base Panel
 Panel = SimpleMenu:registerClass("Panel")
 
-function Panel:Render()
+function Panel:init()
+    self.type = "Panel"
+end
+
+function Panel:Render(pos)
     --sorry nothing
+    --can be used as spacer
 end
 
 --Label
 Label = SimpleMenu:registerClass("Label", "Panel")
+
+function Label:init()
+    self.type = "Label"
+end
 
 function Label:setName(name, prettyName)
     self.name = name
     self.prettyName = prettyName
 end
 
+function Label:Render(pos)
+    Panel:Render(pos)
+    local startx = SimpleMenu.windowPosX
+    local starty = SimpleMenu.windowPosY
+    local padding = SimpleMenu.padding
+    local fontHeight = SimpleMenu.fontHeight
+
+    render.setColor(COLORS.text)
+    render.drawText(startx, starty + (fontHeight + padding) * pos + padding * 0.5,
+        self.prettyName ~= nil and self.prettyName or self.name,
+        TEXT_ALIGN.LEFT)
+end
+
 --Menu
 Menu = SimpleMenu:registerClass("Menu", "Label")
 
+function Menu:init()
+    self.type = "Menu"
+    self.elements = {}
+end
+
 function Menu:addElement(Element)
-    if self.elements == nil then self.elements = {} end
-    
+    table.insert(self.elements, Element)
 end
 
 --Button
 Button = SimpleMenu:registerClass("Button", "Label")
 
+function Button:init()
+    self.type = "Button"
+    self.pressed = false
+end
+
 function Button:onPress()
     self.pressed = true
+    self.onPress = nil
+    self.onRelease = nil
 
     if self.onPress then self.onPress() end
 end
