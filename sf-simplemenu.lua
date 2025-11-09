@@ -45,163 +45,202 @@ local COLORS = {
     background = Color(0, 0, 0, 150),
 }
 
-local SimpleMenu = {
-    classes = {},
-    font = render.getDefaultFont(),
+local SimpleMenu = {}
 
-    cursor = 1,
-    menuStack = {},
-    inputStack = {},
-    root = nil,
+local classes = {}
+local instances = {}
 
-    scrX = 0,
-    scrY = 0,
-    scrCenterX = 0,
-    scrCenterY = 0,
-    windowPosX = 0,
-    windowPosY = 0,
-    windowMarginX = 0,
-    windowMarginY = 0,
-    windowMinWidth = 200,
-    rowHeight = 0,
-}
+local cursor = 1
+local menuStack = {}
+local inputStack = {}
+local root = nil
 
-function assertType(value, valueName, expectedType)
+local font = render.getDefaultFont()
+local scrX = 0
+local scrY = 0
+local scrCenterX = 0
+local scrCenterY = 0
+local windowPosX = 0
+local windowPosY = 0
+local windowMarginX = 0
+local windowMarginY = 0
+local windowMinWidth = 200
+local rowHeight = 0
+
+--for checking value types
+local function assertType(value, valueName, expectedType)
     assert(
         type(value) == "string",
         valueName .. " value should be \"" .. expectedType .. "\", not \"" .. type(value) .. "\""
     )
 end
 
-function SimpleMenu:setFont(font)
-    assertType(font, "Font", "string")
-    self.font = font
+--sets font for menu
+function SimpleMenu:setFont(newFont)
+    assertType(newFont, "Font", "string")
+    font = newFont
 end
 
+--sets row padding for menu elements
 function SimpleMenu:setRowPadding(padding)
     assertType(padding, "Row Padding", "number")
-    self.padding = padding
+    rowPadding = padding
 end
 
+--sets minimum width of menu (in theory, rn works as just width)
 function SimpleMenu:setMinWidth(minWidth)
     assertType(minWidth, "Minimal Width", "number")
-    self.windowMinWidth = minWidth
+    windowMinWidth = minWidth
 end
 
+--sets window borders thinkness by Width (X) and Height (Y)
 function SimpleMenu:setWindowMargins(x, y)
     assertType(x, "Window Margin X", "number")
     assertType(y, "Window Margin Y", "number")
-    self.windowMarginX, self.windowMarginY = x, y
+    windowMarginX, windowMarginY = x, y
 end
 
-function SimpleMenu:assertClass(Name)
-    assert(self.classes[Name] == nil, "Class " .. Name .. " doesn't exists")
+function SimpleMenu:setRoot(Menu)
+    assertType(x, "Menu", "table")
+    assert(instances[Menu] ~= nil, Menu .. " is not a registered Menu instance")
 end
 
-function SimpleMenu:registerClass(Name, ParentName)
-    assertType(Name, "Name", "string")
-
-    if ParentName ~= nil then
-        assertType(ParentName, "Parent Name", "string")
-        assert(self.classes[ParentName] == nil, "Class \"" .. ParentName .. "\" does not exists")
-
-        self.classes[Name] = class(Name, self.classes[ParentName])
-    else
-        self.classes[Name] = class(Name)
-    end
-
-    return self.classes[Name]
-end
-
+--creates and returns Instance of a Class
 function SimpleMenu:createElement(class, parentMenu)
     assertType(class, "Class", "string")
 
     if class == "Menu" then
-        return self.registry[class]:new()
+        instance = classes[class]:new() --create new instance
+        instances[instance] = instance  --register instance
+
+        return instance                 --return instance
     elseif not parentMenu then
         assertType(class, "Parent Menu", "table")
-        return self.registry[class]:new()
+        assert(ParentMenu.class == "Menu", "Parent Element is not \"Menu\" class")
+
+        instance = classes[class]:new()             --create new instance
+
+        table.insert(ParentMenu.elements, instance) --adds new instance as an element of parent menu
+
+        instances[instance] = instance              --register instance
+
+        return instance                             --return instance
     end
 end
 
-function SimpleMenu:InitDisplay()
+function SimpleMenu:printClasses()
+    for _, class in pairs(classes) do
+        print(class.class)
+    end
+end
+
+--registers and returns new Menu Element Class
+function registerClass(Name, ParentName)
+    assertType(Name, "Name", "string")
+
+    assert(classes[Name] == nil, "Class " .. Name .. " already exists")
+
+    if ParentName ~= nil then
+        assertType(ParentName, "Parent Name", "string")
+        assert(classes[ParentName] ~= nil, "Class \"" .. ParentName .. "\" does not exists")
+
+        classes[Name] = class(Name, classes[ParentName])
+    else
+        classes[Name] = class(Name)
+    end
+
+    return classes[Name]
+end
+
+--gets players display resolution and center
+local function InitDisplay()
     scrX, scrY = render.getGameResolution()
     centerX, centerY = srcx * 0.5, srcy * 0.5
 
-    self.scrX, self.scrY, self.scrCenterX, self.scrCenterY = scrX, scrY, centerX, centerY
+    scrX, scrY, scrCenterX, scrCenterY = scrX, scrY, centerX, centerY
 end
 
-function SimpleMenu:Render()
-    local currentMenu = self.menuStack[#self.menuStack]
+--renders everything
+local function RenderMenu()
+    local currentMenu = menuStack[#menuStack]
 
-    _, self.fontHeight = render.getTextSize("TEST")
-    self.windowHeight = (fontHeight + rowPadding) * #currentMenu
-    self.rowHeight = self.fontHeight + self.windowHeight
-    self.windowWidth = self.windowMinWidth
-    self.windowPosX = self.srcCenterPosX - self.windowMinWidth * 0.5
-    self.windowPosY = self.srcCenterPosX - self.windowHeight * 0.5
+    render.setFont(font)
+    _, fontHeight = render.getTextSize("TEST")
+    windowHeight = (fontHeight + rowPadding) * #currentMenu.elements
+    rowHeight = fontHeight + windowHeight
+    windowWidth = windowMinWidth
+    windowPosX = srcCenterPosX - windowMinWidth * 0.5
+    windowPosY = srcCenterPosX - windowHeight * 0.5
 
     render.setColor(COLORS.background)
     render.drawRect(
-        self.windowPosX - self.windowMarginX,
-        self.windowPosY - self.windowMarginY,
-        self.windowWidth + self.windowMarginX * 2,
-        self.windowHeight + self.windowMarginX * 2
+        windowPosX - windowMarginX,
+        windowPosY - windowMarginY,
+        windowWidth + windowMarginX * 2,
+        windowHeight + windowMarginX * 2
     )
 
     render.setColor(COLORS.cursor)
     render.drawRect(
-        self.windowPosX - self.windowMarginX,
-        self.windowPosY + self.rowHeight * (self.cursor - 1),
-        self.windowWidth + self.windowMarginX * 2,
-        self.rowHeight
+        windowPosX - windowMarginX,
+        windowPosY + rowHeight * (cursor - 1),
+        windowWidth + windowMarginX * 2,
+        rowHeight
     )
 
-    for i, Element in ipairs(CurrentMenu) do
+    for i, Element in ipairs(currentMenu.elements) do
         Element:Render(i)
     end
 end
 
+--initializes and opens menu window
 function SimpleMenu:Open()
-    self:InitDisplay()
+    InitDisplay()
 
-    self.cursor = 1
-    self.menuStack = { self.root }
+    cursor = 1
+    menuStack = { root }
 
     hook.add("drawhud", "SimpleMenu Render", function()
-        self:Render()
+        RenderMenu()
     end)
 
     hook.add("inputPressed", "SimpleMenu Input Read", function(key)
-        if self.inputStack and not table.isEmpty(self.inputStack) then
-            self.inputStack[#self.inputStack](key)
+        if inputStack and not table.isEmpty(inputStack) then
+            inputStack[#inputStack](key)
         end
     end)
 end
 
+--closes menu window
 function SimpleMenu:Close()
     hook.remove("drawhud", "SimpleMenu Render")
     hook.remove("inputPressed", "SimpleMenu Input Read")
 end
 
 --classes
---Base Panel
-Panel = SimpleMenu:registerClass("Panel")
+local function initClasses()
+    for _, class in pairs(classes) do
+        class:Init()
+    end
+end
 
-function Panel:init()
-    self.type = "Panel"
+--Base Panel
+Panel = registerClass("Panel")
+
+function Panel:Init()
+    self.class = "Panel"
 end
 
 function Panel:Render(pos)
     --sorry nothing
-    --can be used as spacer
+    --can be used as a spacer
 end
 
 --Label
-Label = SimpleMenu:registerClass("Label", "Panel")
+Label = registerClass("Label", "Panel")
 
-function Label:init()
-    self.type = "Label"
+function Label:Init()
+    self.class = "Label"
 end
 
 function Label:setName(name, prettyName)
@@ -223,10 +262,10 @@ function Label:Render(pos)
 end
 
 --Menu
-Menu = SimpleMenu:registerClass("Menu", "Label")
+Menu = registerClass("Menu", "Label")
 
-function Menu:init()
-    self.type = "Menu"
+function Menu:Init()
+    self.class = "Menu"
     self.elements = {}
 end
 
@@ -235,26 +274,34 @@ function Menu:addElement(Element)
 end
 
 --Button
-Button = SimpleMenu:registerClass("Button", "Label")
+Button = registerClass("Button", "Label")
 
-function Button:init()
-    self.type = "Button"
+function Button:Init()
+    self.class = "Button"
     self.pressed = false
 end
 
 function Button:onPress()
     self.pressed = true
     self.onPress = nil
-    self.onRelease = nil
+    --self.onRelease = nil
 
     if self.onPress then self.onPress() end
 end
 
-function Button:onRelease()
+--[[ function Button:onRelease()
     self.pressed = false
 
     if self.onRelease then self.onRelease() end
-end
+end ]]
+
+
+--initClasses
+initClasses()
+
+SimpleMenu:printClasses()
+
+return SimpleMenu
 
 --[[
 hook.add("drawhud", "", function() --old render function from draft i made. just for history.
