@@ -2,7 +2,9 @@
 --@author dobriyprop
 --@client
 
-local inputENUM = KEY --table of ENUMs to unify keyboard and mouse input codes
+local inputENUM = {} --table of ENUMs to unify keyboard and mouse input codes
+
+setmetatable(inputENUM,KEY) --set metatable to KEY ENUMs table
 
 --define mouse input codes
 inputENUM.MOUSE1 = MOUSE.MOUSE1
