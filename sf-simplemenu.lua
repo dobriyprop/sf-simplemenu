@@ -17,12 +17,14 @@ local SimpleMenu = {
     cursor = 1,
     menuStack = {},
     inputStack = {},
-    
+
+    classes = {},
+
     font = render.getDefaultFont(),
     minwidth = 200,
     marginx = 0,
     marginy = 0,
-    
+
     root = nil,
 }
 
@@ -51,52 +53,121 @@ local menuInputs = { --inputs map
 }
 
 local COLORS = {
-    black = Color(0,0,0),
-    white = Color(255,255,255),
-    background = Color(0,0,0,150)
+    black = Color(0, 0, 0),
+    white = Color(255, 255, 255),
+    background = Color(0, 0, 0, 150)
 }
 
+function assertType(value, valueName, expectedType)
+    assert(type(value) == "string", valueName .. " value should be \"" .. expectedType .. "\", not \"" ..
+    type(value) .. "\"")
+end
+
 function SimpleMenu:setFont(font)
-    assert(type(font) == "string", "Font value should be \"string\" type, not \""..type(font).."\"")
+    assertType(font, "Font", "string")
     self.font = font
 end
 
 function SimpleMenu:setRowPadding(padding)
-    assert(type(padding) == "number", "Row Padding value should be \"number\" type, not \""..type(font).."\"")
+    assertType(padding, "Row Padding", "number")
     self.padding = padding
 end
 
-function SimpleMenu:setWindowMargins(x,y)
-    assert(type(x) == "number", "Windows Margin X value should be \"number\" type, not \""..type(x).."\"")
-    assert(type(y) == "number", "Windows Margin Y value should be \"number\" type, not \""..type(y).."\"")
-    self.marginx,self.marginy = x,y
+function SimpleMenu:setWindowMargins(x, y)
+    assertType(x, "Window Margin X", "number")
+    assertType(y, "Window Margin Y", "number")
+    self.marginx, self.marginy = x, y
 end
 
-hook.add("drawhud","",function() --old render function from draft i made. just for history.
+function SimpleMenu:assertClass(Name)
+    assert(self.classes[Name] == nil, "Class " .. Name .. " doesn't exists")
+end
+
+function SimpleMenu:registerClass(Name, ParentName)
+    assertType(Name, "Name", "string")
+
+    if ParentName ~= nil then
+        assertType(value, "Name", expectedType)
+        assert(self.classes[ParentName] == nil, "Class \"" .. ParentName .. "\" does not exists")
+
+        self.classes[Name] = class(Name, self.classes[ParentName])
+    else
+        self.classes[Name] = class(Name)
+    end
+
+    return self.classes[Name]
+end
+
+--classes
+--Base Panel
+Panel = SimpleMenu:registerClass("Panel")
+
+function Panel:Render()
+    --sorry nothing
+end
+
+--Label
+Label = SimpleMenu:registerClass("Label", "Panel")
+
+function Label:setName(name, prettyName)
+    self.name = name
+    self.prettyName = prettyName
+end
+
+--Menu
+Menu = SimpleMenu:registerClass("Menu", "Label")
+
+function Menu:addElement(Element)
+    if self.elements == nil then self.elements = {} end
+    AssertClass
+end
+
+--Button
+Button = SimpleMenu:registerClass("Button", "Label")
+
+function Button:onPress()
+    self.pressed = true
+
+    if self.onPress then self.onPress() end
+end
+
+function Button:onRelease()
+    self.pressed = false
+
+    if self.onRelease then self.onRelease() end
+end
+
+--[[ 
+hook.add("drawhud", "", function() --old render function from draft i made. just for history.
     render.setFont(render.getDefaultFont())
-    
-    local _,fontHeight = render.getTextSize("TEST")
+
+    local _, fontHeight = render.getTextSize("TEST")
     local windowHeight = (fontHeight + rowPadding) * #currentMenu
     local rowHeight = fontHeight + rowPadding
     local startPosX = screenCenterX - windowWidth * 0.5
     local startPosY = screenCenterY - windowHeight * 0.5
     local counter = 0
-    
-    render.setColor(Color(0,0,0,100))
-    render.drawRect(startPosX - windowMarginX, startPosY - windowMarginY, windowWidth + windowMarginX*2, windowHeight + windowMarginY*2)
-    
-    render.setColor(Color(0,0,0,255))
-    render.drawRect(startPosX - windowMarginX, startPosY + (cursorPos-1) * rowHeight, windowWidth+ windowMarginX*2, rowHeight)
 
-    for i,entry in ipairs(currentMenu) do
+    render.setColor(Color(0, 0, 0, 100))
+    render.drawRect(startPosX - windowMarginX, startPosY - windowMarginY, windowWidth + windowMarginX * 2,
+        windowHeight + windowMarginY * 2)
+
+    render.setColor(Color(0, 0, 0, 255))
+    render.drawRect(startPosX - windowMarginX, startPosY + (cursorPos - 1) * rowHeight, windowWidth + windowMarginX * 2,
+        rowHeight)
+
+    for i, entry in ipairs(currentMenu) do
         local posY = startPosY + (fontHeight + rowPadding) * counter
-        
-        render.setColor(Color(255,255,255))
-        render.drawText(startPosX, posY + rowPadding * 0.5, entry.prettyName ~= nil and entry.prettyName or entry.name, TEXT_ALIGN.LEFT)
+
+        render.setColor(Color(255, 255, 255))
+        render.drawText(startPosX, posY + rowPadding * 0.5, entry.prettyName ~= nil and entry.prettyName or entry.name,
+            TEXT_ALIGN.LEFT)
         if entry.value then
-            render.drawText(startPosX + windowWidth, posY + rowPadding * 0.5, "["..tostring(entry.value).."]", TEXT_ALIGN.RIGHT)
+            render.drawText(startPosX + windowWidth, posY + rowPadding * 0.5, "[" .. tostring(entry.value) .. "]",
+                TEXT_ALIGN.RIGHT)
         end
-        
+
         counter = counter + 1
     end
 end)
+ ]]
