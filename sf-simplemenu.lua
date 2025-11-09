@@ -55,12 +55,12 @@ local menuInputs = { --inputs map
 local COLORS = {
     black = Color(0, 0, 0),
     white = Color(255, 255, 255),
-    background = Color(0, 0, 0, 150)
+    background = Color(0, 0, 0, 150),
 }
 
 function assertType(value, valueName, expectedType)
     assert(type(value) == "string", valueName .. " value should be \"" .. expectedType .. "\", not \"" ..
-    type(value) .. "\"")
+        type(value) .. "\"")
 end
 
 function SimpleMenu:setFont(font)
@@ -137,7 +137,7 @@ function Button:onRelease()
     if self.onRelease then self.onRelease() end
 end
 
---[[ 
+--[[
 hook.add("drawhud", "", function() --old render function from draft i made. just for history.
     render.setFont(render.getDefaultFont())
 

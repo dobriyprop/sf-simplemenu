@@ -1,0 +1,20 @@
+// This file is not used by VS Code. You may copy it's contents into your own settings.json
+{
+    "Lua.format.defaultConfig": {
+        "align_continuous_inline_comment ": "false",
+        "quote_style": "double",
+        "trailing_table_separator": "smart",
+        "max_line_length": "120"
+    },
+    "Lua.diagnostics.globals": [
+        "continue"
+    ],
+    "[lua]": {
+        "editor.formatOnSave": true,
+        "editor.rulers": [
+            {
+                "column": 120
+            }
+        ]
+    }
+}
