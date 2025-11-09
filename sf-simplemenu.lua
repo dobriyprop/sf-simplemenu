@@ -5,9 +5,9 @@
 local SimpleMenu = {
     cursor = 1,
     menuStack = {},
-    inputStack = {}
+    inputStack = {},
     
-    font = render.getDefaultFont()
+    font = render.getDefaultFont(),
     minwidth = 200,
     marginx = 0,
     marginy = 0,
@@ -40,8 +40,8 @@ local menuInputs = {
 }
 
 local COLORS = {
-    black = Color(0,0,0)
-    white = Color(255,255,255)
+    black = Color(0,0,0),
+    white = Color(255,255,255),
     background = Color(0,0,0,150)
 }
 
