@@ -73,6 +73,11 @@ function SimpleMenu:setRowPadding(padding)
     self.padding = padding
 end
 
+function SimpleMenu:setMinWidth(minWidth)
+    assertType(minWidth, "Minimal Width", "number")
+    self.minwidth = minWidth
+end
+
 function SimpleMenu:setWindowMargins(x, y)
     assertType(x, "Window Margin X", "number")
     assertType(y, "Window Margin Y", "number")
@@ -119,7 +124,7 @@ Menu = SimpleMenu:registerClass("Menu", "Label")
 
 function Menu:addElement(Element)
     if self.elements == nil then self.elements = {} end
-    AssertClass
+    
 end
 
 --Button
