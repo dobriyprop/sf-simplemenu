@@ -163,7 +163,7 @@ local function RenderMenu()
         windowPosX - windowMarginX,
         windowPosY - windowMarginY,
         windowWidth + windowMarginX * 2,
-        windowHeight + windowMarginX * 2
+        windowHeight + windowMarginY * 2
     )
 
     render.setColor(COLORS.cursor)
@@ -207,7 +207,6 @@ function SimpleMenu:setWindowMargins(x, y)
 end
 
 function SimpleMenu:setRoot(menuInstance)
-    print(menuInstance, menuInstance:isInstanceOf(self.classes.Menu))
     assert(menuInstance:isInstanceOf(self.classes.Menu), "Instance is not of a \"Menu\" class")
 
     root = menuInstance
