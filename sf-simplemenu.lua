@@ -2,6 +2,17 @@
 --@author dobriyprop
 --@client
 
+local inputENUM = KEY --table of ENUMs to unify keyboard and mouse input codes
+
+--define mouse input codes
+inputENUM.MOUSE1 = MOUSE.MOUSE1
+inputENUM.MOUSE2 = MOUSE.MOUSE2
+inputENUM.MOUSE3 = MOUSE.MOUSE3
+inputENUM.MOUSE4 = MOUSE.MOUSE4
+inputENUM.MOUSE5 = MOUSE.MOUSE5
+inputENUM.MWHEELUP = MOUSE.MWHEELUP
+inputENUM.MWHEELDOWN = MOUSE.MWHEELDOWN
+
 local SimpleMenu = {
     cursor = 1,
     menuStack = {},
@@ -25,18 +36,18 @@ local menuInputENUM = {
 }
 
 local menuInputs = {
-    [KEY.W] = menuInputENUM.up,
-    [KEY.S] = menuInputENUM.down,
-    [KEY.A] = menuInputENUM.left,
-    [KEY.D] = menuInputENUM.right,
+    [inputENUM.W] = menuInputENUM.up,
+    [inputENUM.S] = menuInputENUM.down,
+    [inputENUM.A] = menuInputENUM.left,
+    [inputENUM.D] = menuInputENUM.right,
 
-    [KEY.UPARROW] = menuInputENUM.up,
-    [KEY.DOWNARROW] = menuInputENUM.down,
-    [KEY.LEFTARROW] = menuInputENUM.left,
-    [KEY.RIGHTARROW] = menuInputENUM.right,
+    [inputENUM.UPARROW] = menuInputENUM.up,
+    [inputENUM.DOWNARROW] = menuInputENUM.down,
+    [inputENUM.LEFTARROW] = menuInputENUM.left,
+    [inputENUM.RIGHTARROW] = menuInputENUM.right,
 
-    [KEY.ENTER] = menuInputENUM.enter,
-    [KEY.BACKSPACE] = menuInputENUM.back,
+    [inputENUM.ENTER] = menuInputENUM.enter,
+    [inputENUM.BACKSPACE] = menuInputENUM.back,
 }
 
 local COLORS = {
@@ -61,7 +72,7 @@ function SimpleMenu:setWindowMargins(x,y)
     self.marginx,self.marginy = x,y
 end
 
-hook.add("drawhud","",function()
+hook.add("drawhud","",function() --old render function from draft i made. just for history.
     render.setFont(render.getDefaultFont())
     
     local _,fontHeight = render.getTextSize("TEST")
