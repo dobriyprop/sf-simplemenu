@@ -70,7 +70,7 @@ local rowHeight = 0
 --for checking value types
 local function assertType(value, valueName, expectedType)
     assert(
-        type(value) == "string",
+        type(value) == expectedType,
         valueName .. " value should be \"" .. expectedType .. "\", not \"" .. type(value) .. "\""
     )
 end
@@ -110,21 +110,22 @@ function SimpleMenu:createElement(class, parentMenu)
     assertType(class, "Class", "string")
 
     if class == "Menu" then
-        instance = classes[class]:new() --create new instance
-        instances[instance] = instance  --register instance
+        local instance = classes[class]:new() --create new instance
+        instances[instance] = instance        --register instance
 
-        return instance                 --return instance
-    elseif not parentMenu then
-        assertType(class, "Parent Menu", "table")
-        assert(ParentMenu.class == "Menu", "Parent Element is not \"Menu\" class")
+        return instance                       --return instance
+    elseif parentMenu then
+        assertType(parentMenu, "Parent Menu", "table")
+        assert(parentMenu.class == "Menu", "Parent Element is not \"Menu\" class")
 
-        instance = classes[class]:new()             --create new instance
-
-        table.insert(ParentMenu.elements, instance) --adds new instance as an element of parent menu
-
+        local instance = classes[class]:new()       --create new instance
         instances[instance] = instance              --register instance
 
+        table.insert(parentMenu.elements, instance) --adds new instance as an element of parent menu
+
         return instance                             --return instance
+    else
+        return nil
     end
 end
 

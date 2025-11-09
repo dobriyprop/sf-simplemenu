@@ -5,8 +5,14 @@
 --@include sf-simplemenu.lua
 SimpleMenu = require("sf-simplemenu.lua")
 
-Menu = SimpleMenu:createInstance("Menu")
+SimpleMenu:printClasses()
+
+Menu = SimpleMenu:createElement("Menu")
 for i = 1, 10 do
-    Label = SimpleMenu:createInstance("Label", Menu)
-    Label
+    local label = SimpleMenu:createElement("Label", Menu)
+    label:setName(str(i), "Label " .. i)
 end
+
+enableHud(_, true)
+
+SimpleMenu:Open()
