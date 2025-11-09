@@ -100,15 +100,12 @@ end
 
 function Label:Render(pos)
     Widget:Render(pos)
-    local startx = SimpleMenu.windowPosX
-    local starty = SimpleMenu.windowPosY
-    local padding = SimpleMenu.padding
-    local fontHeight = SimpleMenu.fontHeight
-
     render.setColor(COLORS.text)
-    render.drawText(startx, starty + (fontHeight + padding) * pos + padding * 0.5,
+    render.drawText(
+        windowPosX, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
         self.prettyName ~= nil and self.prettyName or self.name,
-        TEXT_ALIGN.LEFT)
+        TEXT_ALIGN.LEFT
+    )
 end
 
 --Menu
@@ -156,7 +153,7 @@ local function RenderMenu()
     render.setFont(font)
     _, fontHeight = render.getTextSize("TEST")
     windowHeight = (fontHeight + rowPadding) * #currentMenu.elements
-    rowHeight = fontHeight + windowHeight
+    rowHeight = fontHeight + rowPadding
     windowWidth = windowMinWidth
     windowPosX = scrCenterX - windowMinWidth * 0.5
     windowPosY = scrCenterY - windowHeight * 0.5
@@ -180,7 +177,7 @@ local function RenderMenu()
     --print(#currentMenu.elements)
 
     for i, Element in ipairs(currentMenu.elements) do
-        Element:Render(i)
+        Element:Render(i - 1)
     end
 end
 
@@ -207,12 +204,6 @@ function SimpleMenu:setWindowMargins(x, y)
     assertType(x, "Window Margin X", "number")
     assertType(y, "Window Margin Y", "number")
     windowMarginX, windowMarginY = x, y
-end
-
-function SimpleMenu:printClasses()
-    for _, class in pairs(classes) do
-        print(class.type)
-    end
 end
 
 function SimpleMenu:setRoot(menuInstance)

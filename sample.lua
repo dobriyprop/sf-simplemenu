@@ -9,7 +9,7 @@ Menu = SimpleMenu.classes.Menu:new()
 
 SimpleMenu:setRoot(Menu)
 
-for i = 1, 10 do
+for i = 1, 15 do
     local Label = SimpleMenu.classes.Label:new()
     Label:setName(tostring(i), "Label " .. i)
     --Menu:addElement(Label)
