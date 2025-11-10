@@ -70,6 +70,7 @@ local windowPosY = 0
 local windowMarginX = 0
 local windowMarginY = 0
 local windowMinWidth = 200
+local windowWidth = 0
 local rowPadding = 0
 
 local SimpleMenu = {
@@ -245,6 +246,12 @@ function Button:initialize()
     self._type = "Button"
     self._pressable = true
     self._pressed = false
+    self._valuetext = ""
+end
+
+function Button:setValue(text)
+    assertType(text, "Text", { "string", "function" })
+    self._valuetext = text
 end
 
 function Button:onPress()
@@ -253,6 +260,38 @@ function Button:onPress()
     --self.onRelease = nil
 
     if self.onPress then self.onPress() end
+end
+
+function Button:Render(pos)
+    Widget:Render(pos)
+
+    local text = self._text
+
+    if type(self._text) == "function" then
+        text = self._text()
+        assert(type(text) == "string", "Text function returned non string value")
+    end
+
+    render.setColor(COLORS.text)
+    render.drawText(
+        windowPosX, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
+        text,
+        TEXT_ALIGN.LEFT
+    )
+
+    text = self._valuetext
+
+    if type(self._valuetext) == "function" then
+        text = self._valuetext()
+        assert(type(text) == "string", "Value Text function returned non string value")
+    end
+
+    render.setColor(COLORS.text)
+    render.drawText(
+        windowPosX + windowWidth, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
+        text,
+        TEXT_ALIGN.RIGHT
+    )
 end
 
 --[[ function Button:onRelease()
