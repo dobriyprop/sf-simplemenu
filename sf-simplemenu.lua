@@ -2,6 +2,8 @@
 --@author dobriyprop
 --@client
 
+local mathClamp = math.clamp
+
 local inputENUM = table.copy(KEY) --table of ENUMs to unify keyboard and mouse input codes
 
 --define mouse input codes
@@ -35,6 +37,11 @@ local menuInputs = { --inputs map
 
     [inputENUM.ENTER] = menuInputENUM.enter,
     [inputENUM.BACKSPACE] = menuInputENUM.back,
+
+    [inputENUM.MOUSE1] = menuInputENUM.enter,
+    [inputENUM.MOUSE2] = menuInputENUM.back,
+    [inputENUM.MWHEELUP] = menuInputENUM.up,
+    [inputENUM.MWHEELDOWN] = menuInputENUM.down,
 }
 
 local COLORS = {
@@ -45,7 +52,10 @@ local COLORS = {
     background = Color(0, 0, 0, 150),
 }
 
+local instances = {}
+
 local cursor = 1
+local cursorStack = {}
 local menuStack = {}
 local inputStack = {}
 local root = nil
@@ -80,22 +90,51 @@ end
 Widget = class("Widget")
 SimpleMenu.classes.Widget = Widget
 
+--initialize base widget
+function Widget:initialize()
+    self._type = "Widget"
+    self._name = ""
+    self._pressable = false
+end
+
+function Widget:isPressable()
+    return self._pressable
+end
+
+function Widget:setName(name)
+    assertType(name, "Name", "string")
+    self._name = name
+end
+
+function Widget:getName()
+    return self._name
+end
+
 function Widget:getClass()
-    return self.type
+    return self._type
 end
 
 function Widget:Render(pos)
     --sorry nothing
-    --can be used as a spacer
+    --can be used as a spacer maybe
 end
 
 --Label
 Label = class("Label", Widget)
 SimpleMenu.classes.Label = Label
 
-function Label:setName(name, prettyName)
-    self.name = name
-    self.prettyName = prettyName
+function Label:initialize()
+    self._type = "Label"
+    self._text = ""
+end
+
+function Label:setText(text)
+    assertType(text, "Text", "string")
+    self._text = text
+end
+
+function Label:getText()
+    return self._text
 end
 
 function Label:Render(pos)
@@ -103,7 +142,7 @@ function Label:Render(pos)
     render.setColor(COLORS.text)
     render.drawText(
         windowPosX, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
-        self.prettyName ~= nil and self.prettyName or self.name,
+        self._text,
         TEXT_ALIGN.LEFT
     )
 end
@@ -112,20 +151,66 @@ end
 Menu = class("Menu", Label)
 SimpleMenu.classes.Menu = Menu
 
-function Menu:initialize()
-    self.elements = {}
+--handles inputs while in menus
+local function menuInputHandler(key)
+    if menuInputs[key] == nil then return end
+
+    local menuInputCode = menuInputs[key]
+    local menu = menuStack[#menuStack]
+    local menuChildren = menu:getChildren()
+    local cursorChild = menuChildren[cursor]
+
+    if menuInputCode == menuInputENUM.up or menuInputCode == menuInputENUM.down then
+        local direction = menuInputCode == menuInputENUM.up and -1 or 1
+        cursor = mathClamp(cursor + direction, 1, #menuChildren)
+    elseif menuInputCode == menuInputENUM.enter and cursorChild:isPressable() then
+        cursorChild:onPress()
+    elseif menuInputCode == menuInputENUM.back then
+        cursor = 1
+        if menu == root then
+            SimpleMenu:Close()
+        else
+            table.remove(menuStack)
+            table.remove(inputStack)
+            cursor = table.remove(cursorStack)
+        end
+    end
 end
 
-function Menu:addElement(element)
-    self.elements[#self.elements + 1] = element
+function Menu:initialize()
+    self._type = "Menu"
+    self._pressable = true
+    self._children = {}
+    self._inputHandler = menuInputHandler
+end
+
+function Menu:onPress()
+    menuStack[#menuStack + 1] = self
+    inputStack[#inputStack + 1] = self._inputHandler
+    cursorStack[#cursorStack + 1] = cursor
+    cursor = 1
+end
+
+function Menu:addChild(child)
+    self._children[#self._children + 1] = child
+end
+
+function Menu:getChildren()
+    return self._children
 end
 
 --Button
 Button = class("Button", Label)
 SimpleMenu.classes.Button = Button
 
+function Button:initialize()
+    self._type = "Button"
+    self._pressable = true
+    self._pressed = false
+end
+
 function Button:onPress()
-    self.pressed = true
+    self._pressed = true
     self.onPress = nil
     --self.onRelease = nil
 
@@ -152,7 +237,7 @@ local function RenderMenu()
 
     render.setFont(font)
     _, fontHeight = render.getTextSize("TEST")
-    windowHeight = (fontHeight + rowPadding) * #currentMenu.elements
+    windowHeight = (fontHeight + rowPadding) * #currentMenu:getChildren()
     rowHeight = fontHeight + rowPadding
     windowWidth = windowMinWidth
     windowPosX = scrCenterX - windowMinWidth * 0.5
@@ -174,10 +259,8 @@ local function RenderMenu()
         rowHeight
     )
 
-    --print(#currentMenu.elements)
-
-    for i, Element in ipairs(currentMenu.elements) do
-        Element:Render(i - 1)
+    for i, child in ipairs(currentMenu:getChildren()) do
+        child:Render(i - 1)
     end
 end
 
@@ -212,12 +295,28 @@ function SimpleMenu:setRoot(menuInstance)
     root = menuInstance
 end
 
+function SimpleMenu:createInstance(className, ...)
+    assertType(className, "Class Name", "string")
+    assert(self.classes[className] ~= nil, "Class " .. className .. " doesn't exist")
+
+    local instance = self.classes[className]:new(...)
+
+    return instance
+end
+
 --initializes and opens menu window
-function SimpleMenu:Open()
+function SimpleMenu:Open(lockControls, enableCursor)
+    assertType(lockControls, "Lock Controls", "boolean")
+    assertType(enableCursor, "Enable Cursor", "boolean")
+
+    input.enableCursor(enableCursor and enableCursor or false)
+    input.lockControls(lockControls and lockControls or false)
+
     InitDisplay()
 
     cursor = 1
     menuStack = { root }
+    inputStack = { root._inputHandler }
 
     hook.add("drawhud", "SimpleMenu Render", function()
         RenderMenu()
@@ -232,6 +331,8 @@ end
 
 --closes menu window
 function SimpleMenu:Close()
+    input.enableCursor(false)
+    input.lockControls(false)
     hook.remove("drawhud", "SimpleMenu Render")
     hook.remove("inputPressed", "SimpleMenu Input Read")
 end
