@@ -17,9 +17,10 @@ for i = 0, 4 do
     SubMenu:setText("Sub Menu " .. i + 1)
     Menu:addChild(SubMenu)
 
-    for j = 1, 15 do
+    for j = 1, 20 do
         local Label = SimpleMenu:createInstance("Label")
-        Label:setText("Label " .. i * 15 + j)
+        --Label:setText("Label " .. i * 20 + j)
+        Label:setText(function() return tostring(math.round(timer.curtime(), 3)) end)
         SubMenu:addChild(Label)
     end
 end

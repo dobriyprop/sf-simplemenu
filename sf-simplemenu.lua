@@ -77,11 +77,40 @@ local SimpleMenu = {
 }
 
 --for checking value types
-local function assertType(value, valueName, expectedType)
-    assert(
-        type(value) == expectedType,
-        valueName .. " value should be \"" .. expectedType .. "\", not \"" .. type(value) .. "\""
-    )
+local function assertType(value, valueName, expectedTypes)
+    if type(expectedTypes) == "string" then
+        assert(
+            type(value) == expectedTypes,
+            valueName .. " value should be \"" .. expectedTypes .. "\" type, not \"" .. type(value) .. "\""
+        )
+    elseif type(expectedType) == "table" then
+        --builds expected types string from table and asserts incorrect entries in expected types table
+        local expectedTypesString = ""
+        for i, expectedType in ipairs(expectedTypes) do
+            assert(
+                type(expectedType) == "string",
+                "Assert type failed. Multiple expected types should be described as table of strings"
+            )
+            expectedTypesString = expectedTypesString .. "\"expectedType\""
+            if i < #expectedTypes - 1 then
+                expectedTypesString = expectedTypesString .. ", "
+            elseif i == #expectedTypes - 1 then
+                expectedTypesString = expectedTypesString .. " or "
+            end
+        end
+
+        --checks value against table of expected types
+        for i, expectedType in ipairs(expectedTypes) do
+            --if there's a match - exit the function
+            if type(value) == expectedType then return end
+        end
+
+        --if no matches - create an assert
+        assert(
+            false,
+            valueName .. " value should be " .. expectedTypesString .. " type, not \"" .. type(value) .. "\""
+        )
+    end
 end
 
 --classes
@@ -128,8 +157,9 @@ function Label:initialize()
     self._text = ""
 end
 
+--allows for text be defined by string or function on every render call
 function Label:setText(text)
-    assertType(text, "Text", "string")
+    assertType(text, "Text", { "string", "function" })
     self._text = text
 end
 
@@ -139,10 +169,18 @@ end
 
 function Label:Render(pos)
     Widget:Render(pos)
+
+    local text = self._text
+
+    if type(self._text) == "function" then
+        text = self._text()
+        assert(type(text) == "string", "Text function returned non string value")
+    end
+
     render.setColor(COLORS.text)
     render.drawText(
         windowPosX, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
-        self._text,
+        text,
         TEXT_ALIGN.LEFT
     )
 end
