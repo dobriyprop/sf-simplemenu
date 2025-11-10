@@ -117,78 +117,80 @@ end
 --classes
 
 --Base Widget
+---@class Widget
 Widget = class("Widget")
-SimpleMenu.classes.Widget = Widget
+do
+    SimpleMenu.classes.Widget = Widget
 
---initialize base widget
-function Widget:initialize()
-    self._type = "Widget"
-    self._name = ""
-    self._pressable = false
-end
+    --initialize base widget
+    function Widget:initialize()
+        self._type = "Widget"
+        self._name = ""
+        self._pressable = false
+    end
 
-function Widget:isPressable()
-    return self._pressable
-end
+    function Widget:isPressable()
+        return self._pressable
+    end
 
-function Widget:setName(name)
-    assertType(name, "Name", "string")
-    self._name = name
-end
+    function Widget:setName(name)
+        assertType(name, "Name", "string")
+        self._name = name
+    end
 
-function Widget:getName()
-    return self._name
-end
+    function Widget:getName()
+        return self._name
+    end
 
-function Widget:getClass()
-    return self._type
-end
+    function Widget:getClass()
+        return self._type
+    end
 
-function Widget:Render(pos)
-    --sorry nothing
-    --can be used as a spacer maybe
+    function Widget:Render(pos)
+        --sorry nothing
+        --can be used as a spacer maybe
+    end
 end
 
 --Label
+---@class Label : Widget
 Label = class("Label", Widget)
-SimpleMenu.classes.Label = Label
+do
+    SimpleMenu.classes.Label = Label
 
-function Label:initialize()
-    self._type = "Label"
-    self._text = ""
-end
-
---allows for text be defined by string or function on every render call
-function Label:setText(text)
-    assertType(text, "Text", { "string", "function" })
-    self._text = text
-end
-
-function Label:getText()
-    return self._text
-end
-
-function Label:Render(pos)
-    Widget:Render(pos)
-
-    local text = self._text
-
-    if type(self._text) == "function" then
-        text = self._text()
-        assert(type(text) == "string", "Text function returned non string value")
+    function Label:initialize()
+        self._type = "Label"
+        self._text = ""
     end
 
-    render.setColor(COLORS.text)
-    render.drawText(
-        windowPosX, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
-        text,
-        TEXT_ALIGN.LEFT
-    )
-end
+    --allows for text be defined by string or function on every render call
+    function Label:setText(text)
+        assertType(text, "Text", { "string", "function" })
+        self._text = text
+    end
 
---Menu
-Menu = class("Menu", Label)
-SimpleMenu.classes.Menu = Menu
+    function Label:getText()
+        return self._text
+    end
+
+    function Label:Render(pos)
+        Widget:Render(pos)
+
+        local text = self._text
+
+        if type(self._text) == "function" then
+            text = self._text()
+            assert(type(text) == "string", "Text function returned non string value")
+        end
+
+        render.setColor(COLORS.text)
+        render.drawText(
+            windowPosX, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
+            text,
+            TEXT_ALIGN.LEFT
+        )
+    end
+end
 
 --handles inputs while in menus
 local function menuInputHandler(hook, key)
@@ -222,110 +224,120 @@ local function menuInputHandler(hook, key)
     end
 end
 
-function Menu:initialize()
-    self._type = "Menu"
-    self._pressable = true
-    self._children = {}
-    self._inputHandler = menuInputHandler
-end
+--Menu
+---@class Menu : Label
+Menu = class("Menu", Label)
+do
+    SimpleMenu.classes.Menu = Menu
 
-function Menu:press()
-    menuStack[#menuStack + 1] = self
-    inputStack[#inputStack + 1] = self._inputHandler
-    cursorStack[#cursorStack + 1] = cursor
-    cursor = 1
-end
+    function Menu:initialize()
+        self._type = "Menu"
+        self._pressable = true
+        self._children = {}
+        self._inputHandler = menuInputHandler
+    end
 
-function Menu:release()
-    --placeholder
-end
+    function Menu:press()
+        menuStack[#menuStack + 1] = self
+        inputStack[#inputStack + 1] = self._inputHandler
+        cursorStack[#cursorStack + 1] = cursor
+        cursor = 1
+    end
 
-function Menu:addChild(child)
-    self._children[#self._children + 1] = child
-end
+    function Menu:release()
+        --placeholder
+    end
 
-function Menu:getChildren()
-    return self._children
+    function Menu:addChild(child)
+        self._children[#self._children + 1] = child
+    end
+
+    function Menu:getChildren()
+        return self._children
+    end
 end
 
 --Button
+---@class Button : Label
 Button = class("Button", Label)
-SimpleMenu.classes.Button = Button
+do
+    SimpleMenu.classes.Button = Button
 
-function Button:initialize()
-    self._type = "Button"
-    self._pressable = true
-    self._pressed = false
-    self._valuetext = ""
-end
+    function Button:initialize()
+        self._type = "Button"
+        self._pressable = true
+        self._pressed = false
+        self._valuetext = ""
+    end
 
-function Button:setValue(text)
-    assertType(text, "Text", { "string", "function" })
-    self._valuetext = text
-end
+    function Button:setValue(text)
+        assertType(text, "Text", { "string", "function" })
+        self._valuetext = text
+    end
 
-function Button:press()
-    self._pressed = true
+    function Button:press()
+        self._pressed = true
 
-    if self._onPress then self._onPress() end
-end
+        if self._onPress then self._onPress() end
+    end
 
-function Button:release()
-    self._pressed = false
+    function Button:release()
+        self._pressed = false
 
-    if self._onRelease then self._onRelease() end
-end
+        if self._onRelease then self._onRelease() end
+    end
 
-function Button:onPress(func)
-    assertType(func, "On Press Function", "function")
-    self._onPress = func
-end
+    function Button:onPress(func)
+        assertType(func, "On Press Function", "function")
+        self._onPress = func
+    end
 
-function Button:onRelease(func)
-    assertType(func, "On Release Function", "function")
-    self._onRelease = func
-end
+    function Button:onRelease(func)
+        assertType(func, "On Release Function", "function")
+        self._onRelease = func
+    end
 
-function Button:Render(pos)
-    Widget:Render(pos)
+    function Button:Render(pos)
+        Widget:Render(pos)
 
-    if self._pressed then
-        render.setColor(COLORS.text)
-        render.drawRect(
-            windowPosX - windowMarginX,
-            windowPosY + rowHeight * pos,
-            windowWidth + windowMarginX * 2,
-            rowHeight
+        if self._pressed then
+            render.setColor(COLORS.text)
+            render.drawRect(
+                windowPosX - windowMarginX,
+                windowPosY + rowHeight * pos,
+                windowWidth + windowMarginX * 2,
+                rowHeight
+            )
+        end
+
+        render.setColor(self._pressed == true and COLORS.cursor or COLORS.text)
+
+        local text = self._text
+
+        if type(self._text) == "function" then
+            text = self._text()
+            assert(type(text) == "string", "Text function returned non string value")
+        end
+
+        render.drawText(
+            windowPosX, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
+            text,
+            TEXT_ALIGN.LEFT
+        )
+
+        text = self._valuetext
+
+        if type(self._valuetext) == "function" then
+            text = self._valuetext()
+            assert(type(text) == "string", "Value Text function returned non string value")
+        end
+
+        render.drawText(
+            windowPosX + windowWidth, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
+            text,
+            TEXT_ALIGN.RIGHT
         )
     end
-
-    render.setColor(self._pressed == true and COLORS.cursor or COLORS.text)
-
-    local text = self._text
-
-    if type(self._text) == "function" then
-        text = self._text()
-        assert(type(text) == "string", "Text function returned non string value")
-    end
-
-    render.drawText(
-        windowPosX, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
-        text,
-        TEXT_ALIGN.LEFT
-    )
-
-    text = self._valuetext
-
-    if type(self._valuetext) == "function" then
-        text = self._valuetext()
-        assert(type(text) == "string", "Value Text function returned non string value")
-    end
-
-    render.drawText(
-        windowPosX + windowWidth, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
-        text,
-        TEXT_ALIGN.RIGHT
-    )
 end
 
 --gets players display resolution and center
