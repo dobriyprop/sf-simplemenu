@@ -37,24 +37,21 @@ mainMenu:addChild(buttons)
 
 local printButton = simpleMenu:createInstance("Button")
 printButton:setText("Print \"Hello World!\"")
-printButton.onPress = function() print("Hello World!") end
+printButton:onPress(function() print("Hello World!") end)
 buttons:addChild(printButton)
+
+local pressReleaseButton = simpleMenu:createInstance("Button")
+pressReleaseButton:setText("I change name when pressed!")
+pressReleaseButton:onPress(function() pressReleaseButton:setText("I change name when released!") end)
+pressReleaseButton:onRelease(function() pressReleaseButton:setText("I change name when pressed!") end)
+buttons:addChild(pressReleaseButton)
 
 local toggleButton = simpleMenu:createInstance("Button")
 local toggleValue = false
 toggleButton:setText("Toggle Button")
 toggleButton:setValue(function() return "[" .. (toggleValue and "ON" or "OFF") .. "]" end)
-toggleButton.onPress = function() toggleValue = not toggleValue end
+toggleButton:onPress(function() toggleValue = not toggleValue end)
 buttons:addChild(toggleButton)
-
-
-
---[[ for j = 1, 20 do
-    local Label = simpleMenu:createInstance("Label")
-    --Label:setText("Label " .. i * 20 + j)
-    Label:setText(function() return tostring(math.round(timer.curtime(), 3)) end)
-    SubMenu:addChild(Label)
-end ]]
 
 enableHud(_, true)
 simpleMenu:Open(true, false)

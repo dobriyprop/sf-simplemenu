@@ -191,7 +191,7 @@ Menu = class("Menu", Label)
 SimpleMenu.classes.Menu = Menu
 
 --handles inputs while in menus
-local function menuInputHandler(key)
+local function menuInputHandler(hook, key)
     if menuInputs[key] == nil then return end
 
     local menuInputCode = menuInputs[key]
@@ -199,19 +199,25 @@ local function menuInputHandler(key)
     local menuChildren = menu:getChildren()
     local cursorChild = menuChildren[cursor]
 
-    if menuInputCode == menuInputENUM.up or menuInputCode == menuInputENUM.down then
-        local direction = menuInputCode == menuInputENUM.up and -1 or 1
-        cursor = mathClamp(cursor + direction, 1, #menuChildren)
-    elseif menuInputCode == menuInputENUM.enter and cursorChild:isPressable() then
-        cursorChild:onPress()
-    elseif menuInputCode == menuInputENUM.back then
-        cursor = 1
-        if menu == root then
-            SimpleMenu:Close()
-        else
-            table.remove(menuStack)
-            table.remove(inputStack)
-            cursor = table.remove(cursorStack)
+    if hook == true then -- true for inputPressed hook
+        if menuInputCode == menuInputENUM.up or menuInputCode == menuInputENUM.down then
+            local direction = menuInputCode == menuInputENUM.up and -1 or 1
+            cursor = mathClamp(cursor + direction, 1, #menuChildren)
+        elseif menuInputCode == menuInputENUM.enter and cursorChild:isPressable() then
+            cursorChild:press()
+        elseif menuInputCode == menuInputENUM.back then
+            cursor = 1
+            if menu == root then
+                SimpleMenu:Close()
+            else
+                table.remove(menuStack)
+                table.remove(inputStack)
+                cursor = table.remove(cursorStack)
+            end
+        end
+    elseif hook == false then -- false for inputReleased hook
+        if menuInputCode == menuInputENUM.enter and cursorChild:isPressable() then
+            cursorChild:release()
         end
     end
 end
@@ -223,11 +229,15 @@ function Menu:initialize()
     self._inputHandler = menuInputHandler
 end
 
-function Menu:onPress()
+function Menu:press()
     menuStack[#menuStack + 1] = self
     inputStack[#inputStack + 1] = self._inputHandler
     cursorStack[#cursorStack + 1] = cursor
     cursor = 1
+end
+
+function Menu:release()
+    --placeholder
 end
 
 function Menu:addChild(child)
@@ -254,16 +264,42 @@ function Button:setValue(text)
     self._valuetext = text
 end
 
-function Button:onPress()
+function Button:press()
     self._pressed = true
-    self.onPress = nil
-    --self.onRelease = nil
 
-    if self.onPress then self.onPress() end
+    if self._onPress then self._onPress() end
+end
+
+function Button:release()
+    self._pressed = false
+
+    if self._onRelease then self._onRelease() end
+end
+
+function Button:onPress(func)
+    assertType(func, "On Press Function", "function")
+    self._onPress = func
+end
+
+function Button:onRelease(func)
+    assertType(func, "On Release Function", "function")
+    self._onRelease = func
 end
 
 function Button:Render(pos)
     Widget:Render(pos)
+
+    if self._pressed then
+        render.setColor(COLORS.text)
+        render.drawRect(
+            windowPosX - windowMarginX,
+            windowPosY + rowHeight * pos,
+            windowWidth + windowMarginX * 2,
+            rowHeight
+        )
+    end
+
+    render.setColor(self._pressed == true and COLORS.cursor or COLORS.text)
 
     local text = self._text
 
@@ -272,7 +308,6 @@ function Button:Render(pos)
         assert(type(text) == "string", "Text function returned non string value")
     end
 
-    render.setColor(COLORS.text)
     render.drawText(
         windowPosX, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
         text,
@@ -286,19 +321,12 @@ function Button:Render(pos)
         assert(type(text) == "string", "Value Text function returned non string value")
     end
 
-    render.setColor(COLORS.text)
     render.drawText(
         windowPosX + windowWidth, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
         text,
         TEXT_ALIGN.RIGHT
     )
 end
-
---[[ function Button:onRelease()
-    self.pressed = false
-
-    if self.onRelease then self.onRelease() end
-end ]]
 
 --gets players display resolution and center
 local function InitDisplay()
@@ -401,7 +429,13 @@ function SimpleMenu:Open(lockControls, enableCursor)
 
     hook.add("inputPressed", "SimpleMenu Input Read", function(key)
         if inputStack and not table.isEmpty(inputStack) then
-            inputStack[#inputStack](key)
+            inputStack[#inputStack](true, key)
+        end
+    end)
+
+    hook.add("inputReleased", "SimpleMenu Input Read", function(key)
+        if inputStack and not table.isEmpty(inputStack) then
+            inputStack[#inputStack](false, key)
         end
     end)
 end
