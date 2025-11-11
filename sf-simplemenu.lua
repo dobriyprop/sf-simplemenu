@@ -159,7 +159,7 @@ end
 --classes
 
 --Base Widget
-Widget = class("Widget")
+local Widget = class("Widget")
 SimpleMenu.classes.Widget = Widget
 
 --initialize base widget
@@ -192,12 +192,12 @@ function Widget:Render(pos)
 end
 
 --Label
-Label = class("Label", Widget)
+local Label = class("Label", Widget)
 SimpleMenu.classes.Label = Label
 
 function Label:initialize()
     self._type = "Label"
-    self._text = ""
+    --self._text = ""
 end
 
 --allows for text be defined by string or function on every render call
@@ -213,23 +213,25 @@ end
 function Label:Render(pos)
     Widget:Render(pos)
 
-    local text = self._text
+    if self._text then
+        local text = self._text
 
-    if type(self._text) == "function" then
-        text = self._text()
-        assert(type(text) == "string", "Text function returned non string value")
+        if type(self._text) == "function" then
+            text = self._text()
+            assert(type(text) == "string", "Text function returned non string value")
+        end
+
+        render.setColor(COLORS.text)
+        render.drawText(
+            windowPosX, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
+            text,
+            TEXT_ALIGN.LEFT
+        )
     end
-
-    render.setColor(COLORS.text)
-    render.drawText(
-        windowPosX, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
-        text,
-        TEXT_ALIGN.LEFT
-    )
 end
 
 --Menu
-Menu = class("Menu", Label)
+local Menu = class("Menu", Label)
 SimpleMenu.classes.Menu = Menu
 
 --handles inputs while in menus
@@ -249,12 +251,11 @@ local function menuInputHandler(hook, key)
             autoRepeatStop()
             cursorChild:press()
         elseif menuInputCode == menuInputENUM.back then
+            autoRepeatStop()
             cursor = 1
             if menu == root then
-                autoRepeatStop()
                 SimpleMenu:Close()
             else
-                autoRepeatStop()
                 table.remove(menuStack)
                 table.remove(inputStack)
                 cursor = table.remove(cursorStack)
@@ -294,19 +295,19 @@ function Menu:getChildren()
 end
 
 --Button
-Button = class("Button", Label)
+local Button = class("Button", Label)
 SimpleMenu.classes.Button = Button
 
 function Button:initialize()
     self._type = "Button"
     self._pressable = true
     self._pressed = false
-    self._valuetext = ""
+    self._value = nil
 end
 
 function Button:setValue(text)
     assertType(text, "Text", { "string", "function" })
-    self._valuetext = text
+    self._value = text
 end
 
 function Button:press()
@@ -346,31 +347,35 @@ function Button:Render(pos)
 
     render.setColor(self._pressed == true and COLORS.cursor or COLORS.text)
 
-    local text = self._text
+    if self._text then
+        local text = self._text
 
-    if type(self._text) == "function" then
-        text = self._text()
-        assert(type(text) == "string", "Text function returned non string value")
+        if type(self._text) == "function" then
+            text = self._text()
+            assert(type(text) == "string", "Text function returned non string value")
+        end
+
+        render.drawText(
+            windowPosX, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
+            text,
+            TEXT_ALIGN.LEFT
+        )
     end
 
-    render.drawText(
-        windowPosX, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
-        text,
-        TEXT_ALIGN.LEFT
-    )
+    if self._value then
+        local text = self._value
 
-    text = self._valuetext
+        if type(self._value) == "function" then
+            text = self._value()
+            assert(type(text) == "string", "Value Text function returned non string value")
+        end
 
-    if type(self._valuetext) == "function" then
-        text = self._valuetext()
-        assert(type(text) == "string", "Value Text function returned non string value")
+        render.drawText(
+            windowPosX + windowWidth, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
+            text,
+            TEXT_ALIGN.RIGHT
+        )
     end
-
-    render.drawText(
-        windowPosX + windowWidth, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
-        text,
-        TEXT_ALIGN.RIGHT
-    )
 end
 
 --gets players display resolution and center
