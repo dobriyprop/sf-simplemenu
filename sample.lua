@@ -11,6 +11,10 @@ simpleMenu:setRowPadding(4)
 local mainMenu = simpleMenu:createInstance("Menu")
 simpleMenu:setRoot(mainMenu)
 
+local mainMenuLabel = simpleMenu:createInstance("Label")
+mainMenuLabel:setText("Main Menu")
+mainMenu:addChild(mainMenuLabel)
+
 local staticLabels = simpleMenu:createInstance("Menu")
 staticLabels:setText("Static Labels")
 mainMenu:addChild(staticLabels)

@@ -195,9 +195,14 @@ function Widget:initialize()
     self._type = "Widget"
     self._name = ""
     self._pressable = false
+    self._selectable = false
 end
 
 function Widget:isPressable()
+    return self._pressable
+end
+
+function Widget:isSelectable()
     return self._pressable
 end
 
@@ -292,7 +297,18 @@ local function menuInputHandler(pressed, key)
     if pressed == true then -- true for inputPressed hook
         if menuInputCode == menuInputENUM.up or menuInputCode == menuInputENUM.down then
             local direction = menuInputCode == menuInputENUM.up and -1 or 1
-            cursor = mathClamp(cursor + direction, 1, #menuChildren)
+            local newCursor = cursor
+
+            repeat
+                newCursor = newCursor + direction
+            until
+                (direction > 0 and newCursor > #menuChildren) or
+                (direction < 0 and newCursor < 1) or
+                menuChildren[newCursor]:isSelectable()
+
+            if (direction > 0 and newCursor <= #menuChildren) or (direction < 0 and newCursor >= 1) then
+                cursor = newCursor
+            end
         elseif menuInputCode == menuInputENUM.enter and cursorChild:isPressable() then
             autoRepeatStop()
             cursorChild:press()
@@ -315,6 +331,7 @@ end
 function Menu:initialize()
     self._type = "Menu"
     self._pressable = true
+    self._selectable = true
     self._children = {}
     self._inputHandler = menuInputHandler
 end
@@ -362,6 +379,7 @@ SimpleMenu.classes.Button = Button
 function Button:initialize()
     self._type = "Button"
     self._pressable = true
+    self._selectable = true
     self._pressed = false
     self._value = nil
 end
@@ -472,6 +490,7 @@ end
 function Slider:initialize(initTbl)
     self._type = "Slider"
     self._pressable = true
+    self._selectable = true
     self._pressed = false
     assertType(text, "Text", { "string", "function", "nil" })
     self._text = (initTbl and initTbl.text) and initTbl.text or nil
@@ -545,13 +564,13 @@ function Slider:press()
 end
 
 function Slider:change(direction)
-    local value = self._value
+    local oldValue = self._value
 
     self._value = self._value + self._step * (direction == true and 1 or -1)
     if self._minValue then self._value = mathMax(self._value, self._minValue) end
     if self._maxValue then self._value = mathMin(self._value, self._maxValue) end
 
-    if self._onChange then self._onChange(self._value) end
+    if self._onChange and self._value ~= oldValue then self._onChange(self._value) end
 end
 
 function Slider:confirm()
@@ -655,7 +674,11 @@ local function RenderMenu()
     )
 
     for i, child in ipairs(currentMenu:getChildren()) do
+<<<<<<< HEAD
         isSelected = i == cursor
+=======
+        isSelected = i == cursor and child:isSelectable()
+>>>>>>> 2c19020 (made so elements could be marked as unselectacle and made cursor to skip unselectable elements until finds selectable, or until the end of the menu.)
         child:render(i - 1, isSelected)
     end
 end
