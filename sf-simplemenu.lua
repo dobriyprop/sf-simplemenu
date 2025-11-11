@@ -38,12 +38,13 @@ local menuInputs = { --inputs map
     [inputENUM.S] = menuInputENUM.down,
     [inputENUM.A] = menuInputENUM.left,
     [inputENUM.D] = menuInputENUM.right,
+    [inputENUM.E] = menuInputENUM.enter,
+    [inputENUM.Q] = menuInputENUM.back,
 
     [inputENUM.UPARROW] = menuInputENUM.up,
     [inputENUM.DOWNARROW] = menuInputENUM.down,
     [inputENUM.LEFTARROW] = menuInputENUM.left,
     [inputENUM.RIGHTARROW] = menuInputENUM.right,
-
     [inputENUM.ENTER] = menuInputENUM.enter,
     [inputENUM.BACKSPACE] = menuInputENUM.back,
 
