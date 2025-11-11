@@ -214,7 +214,7 @@ function Widget:getClass()
     return self._type
 end
 
-function Widget:Render(pos, isSelected)
+function Widget:render(pos, isSelected)
     --sorry nothing
     --can be used as a spacer maybe
 end
@@ -246,7 +246,9 @@ function Label:getText()
     return self._text
 end
 
-function Label:Render(pos, isSelected)
+function Label:render(pos, isSelected)
+    self.class.super.render(pos)
+
     if isSelected then
         render.setColor(COLORS.cursor)
         render.drawRect(
@@ -342,13 +344,13 @@ function Menu:getChildren()
     return self._children
 end
 
-function Menu:Render(pos, isSelected)
+function Menu:render(pos, isSelected)
     Label.Render(self, pos, isSelected)
     local textColor = isSelected and COLORS.textBright or COLORS.text
     render.setColor(textColor)
     render.drawText(
         windowPosX + windowWidth, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
-        '->',
+        "->",
         TEXT_ALIGN["RIGHT"]
     )
 end
@@ -391,7 +393,7 @@ function Button:onRelease(func)
     self._onRelease = func
 end
 
-function Button:Render(pos, isSelected)
+function Button:render(pos, isSelected)
     if self._pressed or isSelected then
         local bgColor = self._pressed and COLORS.textBright or COLORS.cursor
         render.setColor(bgColor)
@@ -579,7 +581,7 @@ function Slider:onChange(func)
     self._onChange = func
 end
 
-function Slider:Render(pos, isSelected)
+function Slider:render(pos, isSelected)
     if self._pressed or isSelected then
         local bgColor = self._pressed and COLORS.textBright or COLORS.cursor
         render.setColor(bgColor)
@@ -654,7 +656,7 @@ local function RenderMenu()
 
     for i, child in ipairs(currentMenu:getChildren()) do
         isSelected = i == cursor
-        child:Render(i - 1, isSelected)
+        child:render(i - 1, isSelected)
     end
 end
 
