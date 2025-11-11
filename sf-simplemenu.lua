@@ -63,11 +63,10 @@ local menuInputsAutoRepeat = {
 }
 
 local COLORS = {
-    cursor = Color(0, 0, 0),
-    elementActive = Color(0, 0, 0),
-    text = Color(255, 255, 255),
-    textActive = Color(0, 0, 0),
-    background = Color(0, 0, 0, 150),
+    cursor = Color(5, 55, 215),
+    text = Color(215, 215, 215),
+    textBright = Color(255, 255, 255),
+    background = Color(0, 0, 0, 210),
 }
 
 local instances = {}
@@ -215,7 +214,7 @@ function Widget:getClass()
     return self._type
 end
 
-function Widget:Render(pos)
+function Widget:Render(pos, isSelected)
     --sorry nothing
     --can be used as a spacer maybe
 end
@@ -247,9 +246,16 @@ function Label:getText()
     return self._text
 end
 
-function Label:Render(pos)
-    Widget:Render(pos)
-
+function Label:Render(pos, isSelected)
+    if isSelected then
+        render.setColor(COLORS.cursor)
+        render.drawRect(
+            windowPosX - windowMarginX,
+            windowPosY + rowHeight * pos,
+            windowWidth + windowMarginX * 2,
+            rowHeight
+        )
+    end
     if self._text then
         local text = self._text
 
@@ -258,7 +264,8 @@ function Label:Render(pos)
             assert(type(text) == "string", "Text function returned non string value")
         end
 
-        render.setColor(COLORS.text)
+        local textColor = isSelected and COLORS.textBright or COLORS.text
+        render.setColor(textColor)
         render.drawText(
             windowPosX, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
             text,
@@ -335,6 +342,17 @@ function Menu:getChildren()
     return self._children
 end
 
+function Menu:Render(pos, isSelected)
+    Label.Render(self, pos, isSelected)
+    local textColor = isSelected and COLORS.textBright or COLORS.text
+    render.setColor(textColor)
+    render.drawText(
+        windowPosX + windowWidth, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
+        '->',
+        TEXT_ALIGN["RIGHT"]
+    )
+end
+
 --Button
 local Button = class("Button", Label)
 SimpleMenu.classes.Button = Button
@@ -373,11 +391,10 @@ function Button:onRelease(func)
     self._onRelease = func
 end
 
-function Button:Render(pos)
-    Widget:Render(pos)
-
-    if self._pressed then
-        render.setColor(COLORS.text)
+function Button:Render(pos, isSelected)
+    if self._pressed or isSelected then
+        local bgColor = self._pressed and COLORS.textBright or COLORS.cursor
+        render.setColor(bgColor)
         render.drawRect(
             windowPosX - windowMarginX,
             windowPosY + rowHeight * pos,
@@ -386,7 +403,8 @@ function Button:Render(pos)
         )
     end
 
-    render.setColor(self._pressed == true and COLORS.cursor or COLORS.text)
+    local textColor = self._pressed and COLORS.cursor or (isSelected and COLORS.textBright or COLORS.text)
+    render.setColor(textColor)
 
     if self._text then
         local text = self._text
@@ -561,9 +579,10 @@ function Slider:onChange(func)
     self._onChange = func
 end
 
-function Slider:Render(pos)
-    if self._pressed then
-        render.setColor(COLORS.text)
+function Slider:Render(pos, isSelected)
+    if self._pressed or isSelected then
+        local bgColor = self._pressed and COLORS.textBright or COLORS.cursor
+        render.setColor(bgColor)
         render.drawRect(
             windowPosX - windowMarginX,
             windowPosY + rowHeight * pos,
@@ -572,7 +591,8 @@ function Slider:Render(pos)
         )
     end
 
-    render.setColor(self._pressed == true and COLORS.cursor or COLORS.text)
+    local textColor = self._pressed and COLORS.cursor or (isSelected and COLORS.textBright or COLORS.text)
+    render.setColor(textColor)
 
     if self._text then
         local text = self._text
@@ -632,16 +652,9 @@ local function RenderMenu()
         windowHeight + windowMarginY * 2
     )
 
-    render.setColor(COLORS.cursor)
-    render.drawRect(
-        windowPosX - windowMarginX,
-        windowPosY + rowHeight * (cursor - 1),
-        windowWidth + windowMarginX * 2,
-        rowHeight
-    )
-
     for i, child in ipairs(currentMenu:getChildren()) do
-        child:Render(i - 1)
+        isSelected = i == cursor
+        child:Render(i - 1, isSelected)
     end
 end
 
