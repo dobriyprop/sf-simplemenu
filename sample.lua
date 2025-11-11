@@ -53,5 +53,11 @@ toggleButton:setValue(function() return "[" .. (toggleValue and "ON" or "OFF") .
 toggleButton:onPress(function() toggleValue = not toggleValue end)
 buttons:addChild(toggleButton)
 
+local slider = simpleMenu:createInstance("Slider",
+    { text = "Slider test", value = 5, precision = 2, step = 0.05, min = 0, max = 10 })
+slider:onChange(function(value) print("On Change:", value) end)
+slider:onConfirm(function(value) print("On Confirm:", value) end)
+mainMenu:addChild(slider)
+
 enableHud(_, true)
 simpleMenu:Open(true, false)

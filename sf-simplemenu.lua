@@ -2,7 +2,16 @@
 --@author dobriyprop
 --@client
 
+local mathMin = math.min
+local mathMax = math.max
 local mathClamp = math.clamp
+local mathRound = math.round
+
+local tableInsert = table.insert
+local tableRemove = table.remove
+
+local stringFormat = string.format
+
 
 local inputENUM = table.copy(KEY) --table of ENUMs to unify keyboard and mouse input codes
 
@@ -68,6 +77,7 @@ local autoRepeatAllowed = true
 local cursorStack = {}
 local menuStack = {}
 local inputStack = {}
+local activeElement = nil
 local root = nil
 
 local font = render.getDefaultFont()
@@ -156,6 +166,25 @@ local function processInput(pressed, key)
     end
 end
 
+local function pushInputStack(inputHandler)
+    assertType(inputHandler, "Input Handler", "function")
+    tableInsert(inputStack, inputHandler)
+end
+
+local function popInputStack()
+    return tableRemove(inputStack)
+end
+
+local function activateElement(Instance)
+    activeElement = Instance
+    pushInputStack(Instance._inputHandler)
+end
+
+local function deactivateElement(Instance)
+    activeElement = nil
+    popInputStack()
+end
+
 --classes
 
 --Base Widget
@@ -189,6 +218,14 @@ end
 function Widget:Render(pos)
     --sorry nothing
     --can be used as a spacer maybe
+end
+
+function Widget:press()
+    --dummy function
+end
+
+function Widget:release()
+    --dummy function
 end
 
 --Label
@@ -235,7 +272,7 @@ local Menu = class("Menu", Label)
 SimpleMenu.classes.Menu = Menu
 
 --handles inputs while in menus
-local function menuInputHandler(hook, key)
+local function menuInputHandler(pressed, key)
     if menuInputs[key] == nil then return end
 
     local menuInputCode = menuInputs[key]
@@ -243,7 +280,7 @@ local function menuInputHandler(hook, key)
     local menuChildren = menu:getChildren()
     local cursorChild = menuChildren[cursor]
 
-    if hook == true then -- true for inputPressed hook
+    if pressed == true then -- true for inputPressed hook
         if menuInputCode == menuInputENUM.up or menuInputCode == menuInputENUM.down then
             local direction = menuInputCode == menuInputENUM.up and -1 or 1
             cursor = mathClamp(cursor + direction, 1, #menuChildren)
@@ -256,12 +293,10 @@ local function menuInputHandler(hook, key)
             if menu == root then
                 SimpleMenu:Close()
             else
-                table.remove(menuStack)
-                table.remove(inputStack)
-                cursor = table.remove(cursorStack)
+                menu:back()
             end
         end
-    elseif hook == false then -- false for inputReleased hook
+    elseif pressed == false then -- false for inputReleased hook
         if menuInputCode == menuInputENUM.enter and cursorChild:isPressable() then
             cursorChild:release()
         end
@@ -276,14 +311,20 @@ function Menu:initialize()
 end
 
 function Menu:press()
-    menuStack[#menuStack + 1] = self
-    inputStack[#inputStack + 1] = self._inputHandler
-    cursorStack[#cursorStack + 1] = cursor
+    pushInputStack(self._inputHandler)
+    table.insert(menuStack, self)
+    table.insert(cursorStack, cursor)
     cursor = 1
 end
 
 function Menu:release()
     --placeholder
+end
+
+function Menu:back()
+    popInputStack()
+    tableRemove(menuStack)
+    cursor = tableRemove(cursorStack)
 end
 
 function Menu:addChild(child)
@@ -355,6 +396,10 @@ function Button:Render(pos)
             assert(type(text) == "string", "Text function returned non string value")
         end
 
+        if type(self._text) ~= "string" then
+            text = tostring(text)
+        end
+
         render.drawText(
             windowPosX, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
             text,
@@ -370,9 +415,190 @@ function Button:Render(pos)
             assert(type(text) == "string", "Value Text function returned non string value")
         end
 
+        if type(self._value) ~= "string" then
+            text = tostring(text)
+        end
+
         render.drawText(
             windowPosX + windowWidth, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
             text,
+            TEXT_ALIGN.RIGHT
+        )
+    end
+end
+
+--value slider
+local Slider = class("Slider", Label)
+SimpleMenu.classes.Slider = Slider
+
+local function sliderInputHandler(pressed, key)
+    if menuInputs[key] == nil then return end
+
+    local menuInputCode = menuInputs[key]
+
+    if pressed == true then -- true for inputPressed hook
+        if menuInputCode == menuInputENUM.up or menuInputCode == menuInputENUM.down then
+            activeElement:change(menuInputCode == menuInputENUM.up)
+        elseif menuInputCode == menuInputENUM.enter then
+            autoRepeatStop()
+            activeElement:confirm()
+        elseif menuInputCode == menuInputENUM.back then
+            autoRepeatStop()
+            activeElement:cancel()
+        end
+    end
+end
+
+function Slider:initialize(initTbl)
+    self._type = "Slider"
+    self._pressable = true
+    self._pressed = false
+    assertType(text, "Text", { "string", "function", "nil" })
+    self._text = (initTbl and initTbl.text) and initTbl.text or nil
+    assertType(text, "Precision", { "number", "nil" })
+    self._precision = (initTbl and initTbl.precision) and initTbl.precision or nil
+    assertType(text, "Min Calue", { "number", "nil" })
+    self._minValue = (initTbl and initTbl.min) and initTbl.min or nil
+    assertType(text, "Mac Value", { "number", "nil" })
+    self._maxValue = (initTbl and initTbl.max) and initTbl.max or nil
+    assertType(text, "Increment/Decrement Step", { "number", "nil" })
+    self._step = (initTbl and initTbl.step) and initTbl.step or 1
+
+    assertType(text, "Value", { "number", "nil" })
+    local value = (initTbl and initTbl.value) and initTbl.value or 0
+    if self._minValue then value = mathMax(self._minValue, value) end
+    if self._maxValue then value = mathMin(self._maxValue, value) end
+    self._value = value
+
+    self._inputHandler = sliderInputHandler
+end
+
+function Slider:setValue(value)
+    assertType(value, "Value", "number")
+    self._value = value
+end
+
+function Slider:getValue()
+    return self._value
+end
+
+function Slider:setPrecision(precision)
+    assertType(value, "Precision", { "number", "nil" })
+    if precision then
+        assert(precision >= 0, "Precision should be 0 or more")
+        self._precision = precision
+    else
+        self._precision = nil
+    end
+end
+
+function Slider:setMinValue(minValue)
+    assertType(minValue, "MinValue", { "number", "nil" })
+    if minValue then
+        self._minValue = minValue
+        self._value = mathMax(minValue, value)
+    else
+        self._minValue = nil
+    end
+end
+
+function Slider:setMaxValue(maxValue)
+    assertType(maxValue, "Value", { "number", "nil" })
+    if maxValue then
+        self._minValue = maxValue
+        self._value = mathMin(maxValue, value)
+    else
+        self._minValue = nil
+    end
+end
+
+function Slider:setStep(step)
+    assertType(step, "Step", "number")
+    self._step = step
+end
+
+function Slider:press()
+    self._pressed = true
+    self._oldValue = self._value
+
+    activateElement(self)
+end
+
+function Slider:change(direction)
+    local value = self._value
+
+    self._value = self._value + self._step * (direction == true and 1 or -1)
+    if self._minValue then self._value = mathMax(self._value, self._minValue) end
+    if self._maxValue then self._value = mathMin(self._value, self._maxValue) end
+
+    if self._onChange then self._onChange(self._value) end
+end
+
+function Slider:confirm()
+    self._pressed = false
+    self._oldValue = nil
+
+    if self._onConfirm then self._onConfirm(self._value) end
+
+    deactivateElement()
+end
+
+function Slider:cancel()
+    self._pressed = false
+    self._value = self._oldValue
+    self._oldValue = nil
+
+    deactivateElement()
+end
+
+function Slider:onConfirm(func)
+    assertType(func, "On Confirm Function", "function")
+    self._onConfirm = func
+end
+
+function Slider:onChange(func)
+    assertType(func, "On Confirm Function", "function")
+    self._onChange = func
+end
+
+function Slider:Render(pos)
+    if self._pressed then
+        render.setColor(COLORS.text)
+        render.drawRect(
+            windowPosX - windowMarginX,
+            windowPosY + rowHeight * pos,
+            windowWidth + windowMarginX * 2,
+            rowHeight
+        )
+    end
+
+    render.setColor(self._pressed == true and COLORS.cursor or COLORS.text)
+
+    if self._text then
+        local text = self._text
+
+        if type(self._text) == "function" then
+            text = self._text()
+            assert(type(text) == "string", "Text function returned non string value")
+        end
+
+        if type(self._text) ~= "string" then
+            text = tostring(text)
+        end
+
+        render.drawText(
+            windowPosX, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
+            text,
+            TEXT_ALIGN.LEFT
+        )
+    end
+
+    if self._value then
+        render.drawText(
+            windowPosX + windowWidth, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
+            "[" ..
+            (self._precision and string.format("%.0" .. self._precision .. "f", self._value) or tostring(self._value))
+            .. "]",
             TEXT_ALIGN.RIGHT
         )
     end
