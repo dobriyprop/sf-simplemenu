@@ -124,6 +124,38 @@ local function assertType(value, valueName, expectedTypes)
     end
 end
 
+--stops autorepeat. can be used for certain input processing functions that do not need to be repeated
+local function autoRepeatStop()
+    timer.stop("autorepeat_delay")
+    timer.stop("autorepeat")
+end
+
+--input processing function with autorepeat functionality
+local function processInput(pressed, key)
+    --if new input arrived be it on press or release - stop all autorepeat timers
+    autoRepeatStop()
+
+    --check if input stack is valid table and not empty
+    if inputStack and not table.isEmpty(inputStack) then
+        --perform an input action according to pressed keys
+        local inputFunc = inputStack[#inputStack]
+
+        --if input is pressed and and auto repeat is allowed and menu input action is allowed to be autorepeated
+        if pressed == true and autoRepeatAllowed == true then
+            --create autorepeat delay timer for X seconds (0.5 in this case, make it adjustable later)
+            timer.create("autorepeat_delay", 0.5, 1, function()
+                --after which autorepeat timer will start and spam last performed input Y seconds
+                --(0.03 in this case, also make it adjustable later)
+                timer.create("autorepeat", 0.02, 0, function()
+                    inputFunc(true, key)
+                end)
+            end)
+        end
+
+        inputFunc(pressed, key)
+    end
+end
+
 --classes
 
 --Base Widget
@@ -214,12 +246,15 @@ local function menuInputHandler(hook, key)
             local direction = menuInputCode == menuInputENUM.up and -1 or 1
             cursor = mathClamp(cursor + direction, 1, #menuChildren)
         elseif menuInputCode == menuInputENUM.enter and cursorChild:isPressable() then
+            autoRepeatStop()
             cursorChild:press()
         elseif menuInputCode == menuInputENUM.back then
             cursor = 1
             if menu == root then
+                autoRepeatStop()
                 SimpleMenu:Close()
             else
+                autoRepeatStop()
                 table.remove(menuStack)
                 table.remove(inputStack)
                 cursor = table.remove(cursorStack)
@@ -419,29 +454,12 @@ function SimpleMenu:createInstance(className, ...)
     return instance
 end
 
---input processing function with autorepeat functionality
-local function processInput(pressed, key)
-    --if new input arrived be it on press or release - reset all autorepeat timers
-    timer.stop("autorepeat_delay")
-    timer.stop("autorepeat")
-
-    --check if input stack is valid table and not empty
-    if inputStack and not table.isEmpty(inputStack) then
-        --perform an input action according to pressed keys
-        local inputFunc = inputStack[#inputStack]
-        inputFunc(pressed, key)
-
-        --if input is pressed and and auto repeat is allowed and menu input action is allowed to be autorepeated
-        if pressed == true and autoRepeatAllowed == true and menuInputsAutoRepeat[menuInputs[key]] == true then
-            --create autorepeat delay timer for X seconds (0.5 in this case, make it adjustable later)
-            timer.create("autorepeat_delay", 0.5, 1, function()
-                --after which autorepeat timer will start and spam last performed input Y seconds
-                --(0.03 in this case, also make it adjustable later)
-                timer.create("autorepeat", 0.02, 0, function()
-                    inputFunc(true, key)
-                end)
-            end)
-        end
+function SimpleMenu:autoRepeat(enabled)
+    if enabled ~= nil then
+        assertType(enabled, "Auto Repeat", "boolean")
+        autoRepeatAllowed = enabled
+    else
+        return autoRepeatAllowed
     end
 end
 
