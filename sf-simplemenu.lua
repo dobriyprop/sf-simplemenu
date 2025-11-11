@@ -674,11 +674,7 @@ local function RenderMenu()
     )
 
     for i, child in ipairs(currentMenu:getChildren()) do
-<<<<<<< HEAD
-        isSelected = i == cursor
-=======
         isSelected = i == cursor and child:isSelectable()
->>>>>>> 2c19020 (made so elements could be marked as unselectacle and made cursor to skip unselectable elements until finds selectable, or until the end of the menu.)
         child:render(i - 1, isSelected)
     end
 end
