@@ -44,6 +44,15 @@ local menuInputs = { --inputs map
     [inputENUM.MWHEELDOWN] = menuInputENUM.down,
 }
 
+local menuInputsAutoRepeat = {
+    [menuInputENUM.up] = true,
+    [menuInputENUM.down] = true,
+    [menuInputENUM.left] = true,
+    [menuInputENUM.right] = true,
+    [menuInputENUM.enter] = false,
+    [menuInputENUM.back] = false,
+}
+
 local COLORS = {
     cursor = Color(0, 0, 0),
     elementActive = Color(0, 0, 0),
@@ -55,6 +64,7 @@ local COLORS = {
 local instances = {}
 
 local cursor = 1
+local autoRepeatAllowed = true
 local cursorStack = {}
 local menuStack = {}
 local inputStack = {}
@@ -409,6 +419,32 @@ function SimpleMenu:createInstance(className, ...)
     return instance
 end
 
+--input processing function with autorepeat functionality
+local function processInput(pressed, key)
+    --if new input arrived be it on press or release - reset all autorepeat timers
+    timer.stop("autorepeat_delay")
+    timer.stop("autorepeat")
+
+    --check if input stack is valid table and not empty
+    if inputStack and not table.isEmpty(inputStack) then
+        --perform an input action according to pressed keys
+        local inputFunc = inputStack[#inputStack]
+        inputFunc(pressed, key)
+
+        --if input is pressed and and auto repeat is allowed and menu input action is allowed to be autorepeated
+        if pressed == true and autoRepeatAllowed == true and menuInputsAutoRepeat[menuInputs[key]] == true then
+            --create autorepeat delay timer for X seconds (0.5 in this case, make it adjustable later)
+            timer.create("autorepeat_delay", 0.5, 1, function()
+                --after which autorepeat timer will start and spam last performed input Y seconds
+                --(0.03 in this case, also make it adjustable later)
+                timer.create("autorepeat", 0.02, 0, function()
+                    inputFunc(true, key)
+                end)
+            end)
+        end
+    end
+end
+
 --initializes and opens menu window
 function SimpleMenu:Open(lockControls, enableCursor)
     assertType(lockControls, "Lock Controls", "boolean")
@@ -428,15 +464,11 @@ function SimpleMenu:Open(lockControls, enableCursor)
     end)
 
     hook.add("inputPressed", "SimpleMenu Input Read", function(key)
-        if inputStack and not table.isEmpty(inputStack) then
-            inputStack[#inputStack](true, key)
-        end
+        processInput(true, key)
     end)
 
     hook.add("inputReleased", "SimpleMenu Input Read", function(key)
-        if inputStack and not table.isEmpty(inputStack) then
-            inputStack[#inputStack](false, key)
-        end
+        processInput(false, key)
     end)
 end
 

@@ -15,7 +15,7 @@ local staticLabels = simpleMenu:createInstance("Menu")
 staticLabels:setText("Static Labels")
 mainMenu:addChild(staticLabels)
 
-for i = 1, 10 do
+for i = 1, 50 do
     local label = simpleMenu:createInstance("Label")
     label:setText("Label " .. i)
     staticLabels:addChild(label)
