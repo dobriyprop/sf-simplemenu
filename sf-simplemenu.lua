@@ -247,7 +247,7 @@ function Label:getText()
 end
 
 function Label:render(pos, isSelected)
-    self.class.super.render(pos)
+    self.class.super.render(pos, isSelected)
 
     if isSelected then
         render.setColor(COLORS.cursor)
@@ -345,7 +345,7 @@ function Menu:getChildren()
 end
 
 function Menu:render(pos, isSelected)
-    Label.Render(self, pos, isSelected)
+    self.class.super.render(pos, isSelected)
     local textColor = isSelected and COLORS.textBright or COLORS.text
     render.setColor(textColor)
     render.drawText(
