@@ -14,7 +14,6 @@ local stringFormat = string.format
 
 
 local inputENUM = table.copy(KEY) --table of ENUMs to unify keyboard and mouse input codes
-
 --define mouse input codes
 inputENUM.MOUSE1 = MOUSE.MOUSE1
 inputENUM.MOUSE2 = MOUSE.MOUSE2
@@ -23,6 +22,16 @@ inputENUM.MOUSE4 = MOUSE.MOUSE4
 inputENUM.MOUSE5 = MOUSE.MOUSE5
 inputENUM.MWHEELUP = MOUSE.MWHEELUP
 inputENUM.MWHEELDOWN = MOUSE.MWHEELDOWN
+
+--create a reverse key ENUM table to get Key name by ENUM code
+
+local inputENUMToKey = {}
+
+for k, v in pairs(inputENUM) do
+    inputENUMToKey[v] = k
+end
+
+printTable(inputENUMToKey)
 
 local menuInputENUM = { --ENUMs for menu actions
     up = 1,
@@ -89,7 +98,7 @@ local windowPosX = 0
 local windowPosY = 0
 local windowMarginX = 0
 local windowMarginY = 0
-local windowMinWidth = 200
+local windowMinWidth = 50
 local windowWidth = 0
 local rowPadding = 0
 
@@ -192,11 +201,18 @@ local Widget = class("Widget")
 SimpleMenu.classes.Widget = Widget
 
 --initialize base widget
-function Widget:initialize()
+function Widget:initialize(tbl)
     self._type = "Widget"
-    self._name = ""
     self._pressable = false
     self._selectable = false
+
+    if tbl then
+        assertType(tbl, "Table of arguments", "table")
+        assertType(tbl.name, "Text", { "string", "nil" })
+        self._name = tbl.name and tbl.name or nil
+    else
+        self._name = nil
+    end
 end
 
 function Widget:isPressable()
@@ -220,6 +236,10 @@ function Widget:getClass()
     return self._type
 end
 
+function Widget:renderGetTextWidth()
+    return 0
+end
+
 function Widget:render(pos, isSelected)
     --sorry nothing
     --can be used as a spacer maybe
@@ -237,9 +257,15 @@ end
 local Label = class("Label", Widget)
 SimpleMenu.classes.Label = Label
 
-function Label:initialize()
+function Label:initialize(tbl)
+    Widget.initialize(self, tbl)
     self._type = "Label"
-    --self._text = ""
+
+    if tbl then
+        assertType(tbl, "Table of arguments", "table")
+        assertType(tbl.text, "Text", { "string", "function", "nil" })
+        self._text = tbl.text and tbl.text or nil
+    end
 end
 
 --allows for text be defined by string or function on every render call
@@ -250,6 +276,26 @@ end
 
 function Label:getText()
     return self._text
+end
+
+function Label:renderGetTextWidth()
+    local totalWidth = 0
+
+    totalWidth = totalWidth + Widget.renderGetTextWidth(self)
+
+    if self._text then
+        local text = self._text
+
+        if type(self._text) == "function" then
+            text = self._text()
+            assert(type(text) == "string", "Text function returned non string value")
+        end
+
+        local width, _ = render.getTextSize(text)
+        totalWidth = totalWidth + width
+    end
+
+    return totalWidth
 end
 
 function Label:render(pos, isSelected)
@@ -329,11 +375,38 @@ local function menuInputHandler(pressed, key)
     end
 end
 
-function Menu:initialize()
+function Menu:initialize(tbl)
     self._type = "Menu"
     self._pressable = true
     self._selectable = true
-    self._children = {}
+
+    if tbl then
+        assertType(tbl, "Table of arguments", "table")
+        assertType(tbl.text, "Text", { "string", "function", "nil" })
+        self._text = tbl.text and tbl.text or nil
+
+        assertType(tbl.children, "Children table", { "table", "nil" })
+        assert(
+            function()
+                if tbl.children == nil or table.isEmpty(tbl.children) then return true end
+
+                for _, child in ipairs(tbl.children) do
+                    if child.getType == nil or SimpleMenu.classes[child.getType()] == nil then
+                        return false
+                    end
+                end
+
+                return true
+            end,
+            "One of specified children does not belong to any registered class"
+        )
+
+        self._children = tbl.children and tbl.children or {}
+    else
+        self._text = nil
+        self._children = {}
+    end
+
     self._inputHandler = menuInputHandler
 end
 
@@ -362,6 +435,16 @@ function Menu:getChildren()
     return self._children
 end
 
+function Menu:renderGetTextWidth()
+    local totalWidth = render.getTextSize("\t")
+
+    totalWidth = totalWidth + Label.renderGetTextWidth(self)
+    local width, _ = render.getTextSize("->")
+    totalWidth = totalWidth + width
+
+    return totalWidth
+end
+
 function Menu:render(pos, isSelected)
     Label.render(self, pos, isSelected)
     local textColor = isSelected and COLORS.textBright or COLORS.text
@@ -377,12 +460,22 @@ end
 local Button = class("Button", Label)
 SimpleMenu.classes.Button = Button
 
-function Button:initialize()
+function Button:initialize(tbl)
     self._type = "Button"
     self._pressable = true
     self._selectable = true
     self._pressed = false
-    self._value = nil
+
+    if tbl then
+        assertType(tbl, "Table of arguments", "table")
+        assertType(tbl.value, "Text", { "string", "function", "nil" })
+        self._text = tbl.text and tbl.text or nil
+        assertType(tbl.value, "Value", { "string", "function", "nil" })
+        self._value = tbl.value and tbl.value or nil
+    else
+        self._text = nil
+        self._value = nil
+    end
 end
 
 function Button:setValue(text)
@@ -410,6 +503,44 @@ end
 function Button:onRelease(func)
     assertType(func, "On Release Function", "function")
     self._onRelease = func
+end
+
+function Button:renderGetTextWidth()
+    local totalWidth = render.getTextSize("\t")
+
+    if self._text then
+        local text = self._text
+
+        if type(self._text) == "function" then
+            text = self._text()
+            assert(type(text) == "string", "Text function returned non string value")
+        end
+
+        if type(self._text) ~= "string" then
+            text = tostring(text)
+        end
+
+        local width, _ = render.getTextSize(text)
+        totalWidth = totalWidth + width
+    end
+
+    if self._value then
+        local text = self._value
+
+        if type(self._value) == "function" then
+            text = self._value()
+            assert(type(text) == "string", "Value Text function returned non string value")
+        end
+
+        if type(self._value) ~= "string" then
+            text = tostring(text)
+        end
+
+        local width, _ = render.getTextSize(text)
+        totalWidth = totalWidth + width
+    end
+
+    return totalWidth
 end
 
 function Button:render(pos, isSelected)
@@ -488,27 +619,39 @@ local function sliderInputHandler(pressed, key)
     end
 end
 
-function Slider:initialize(initTbl)
+function Slider:initialize(tbl)
     self._type = "Slider"
     self._pressable = true
     self._selectable = true
     self._pressed = false
-    assertType(text, "Text", { "string", "function", "nil" })
-    self._text = (initTbl and initTbl.text) and initTbl.text or nil
-    assertType(text, "Precision", { "number", "nil" })
-    self._precision = (initTbl and initTbl.precision) and initTbl.precision or nil
-    assertType(text, "Min Calue", { "number", "nil" })
-    self._minValue = (initTbl and initTbl.min) and initTbl.min or nil
-    assertType(text, "Mac Value", { "number", "nil" })
-    self._maxValue = (initTbl and initTbl.max) and initTbl.max or nil
-    assertType(text, "Increment/Decrement Step", { "number", "nil" })
-    self._step = (initTbl and initTbl.step) and initTbl.step or 1
 
-    assertType(text, "Value", { "number", "nil" })
-    local value = (initTbl and initTbl.value) and initTbl.value or 0
-    if self._minValue then value = mathMax(self._minValue, value) end
-    if self._maxValue then value = mathMin(self._maxValue, value) end
-    self._value = value
+    if tbl then
+        assertType(tbl, "Table of arguments", "table")
+
+        assertType(text, "Text", { "string", "function", "nil" })
+        self._text = (tbl and tbl.text) and tbl.text or nil
+        assertType(text, "Precision", { "number", "nil" })
+        self._precision = (tbl and tbl.precision) and tbl.precision or nil
+        assertType(text, "Min Calue", { "number", "nil" })
+        self._minValue = (tbl and tbl.min) and tbl.min or nil
+        assertType(text, "Mac Value", { "number", "nil" })
+        self._maxValue = (tbl and tbl.max) and tbl.max or nil
+        assertType(text, "Increment/Decrement Step", { "number", "nil" })
+        self._step = (tbl and tbl.step) and tbl.step or 1
+
+        assertType(text, "Value", { "number", "nil" })
+        local value = (tbl and tbl.value) and tbl.value or 0
+        if self._minValue then value = mathMax(self._minValue, value) end
+        if self._maxValue then value = mathMin(self._maxValue, value) end
+        self._value = value
+    else
+        self._text = nil
+        self._precision = nil
+        self._minValue = nil
+        self._maxValue = nil
+        self._step = 1
+        self._value = 0
+    end
 
     self._inputHandler = sliderInputHandler
 end
@@ -601,6 +744,37 @@ function Slider:onChange(func)
     self._onChange = func
 end
 
+function Slider:renderGetTextWidth()
+    local totalWidth = render.getTextSize("\t")
+
+    if self._text then
+        local text = self._text
+
+        if type(self._text) == "function" then
+            text = self._text()
+            assert(type(text) == "string", "Text function returned non string value")
+        end
+
+        if type(self._text) ~= "string" then
+            text = tostring(text)
+        end
+
+        local width, _ = render.getTextSize(text)
+        totalWidth = totalWidth + width
+    end
+
+    if self._value then
+        local width, _ = render.getTextSize(
+            "[" ..
+            (self._precision and string.format("%.0" .. self._precision .. "f", self._value) or tostring(self._value))
+            .. "]"
+        )
+        totalWidth = totalWidth + width
+    end
+
+    return totalWidth
+end
+
 function Slider:render(pos, isSelected)
     if self._pressed or isSelected then
         local bgColor = self._pressed and COLORS.textBright or COLORS.cursor
@@ -646,6 +820,156 @@ function Slider:render(pos, isSelected)
     end
 end
 
+--value slider
+local KeyReader = class("KeyReader", Label)
+SimpleMenu.classes.KeyReader = KeyReader
+
+local function keyReaderInputHandler(pressed, key)
+    --local KeyName = inputENUMToKey[key]
+    if pressed == true then
+        autoRepeatStop()
+        activeElement:confirm(key)
+    end
+end
+
+function KeyReader:initialize(tbl)
+    self._type = "KeyReader"
+    self._pressable = true
+    self._selectable = true
+    self._pressed = false
+    if tbl then
+        assertType(tbl, "Table of arguments", "table")
+        assertType(text, "Text", { "string", "function", "nil" })
+        self._text = (tbl and tbl.text) and tbl.text or nil
+
+        assertType(text, "Value", { "number", "nil" })
+        self._value = (tbl and tbl.value) and tbl.value or nil
+    else
+        self._text = nil
+        self._value = nil
+    end
+
+    self._inputHandler = keyReaderInputHandler
+end
+
+function KeyReader:setValue(value)
+    assertType(value, "Value", { "string", "number" })
+
+    if type(value) == string then
+        assert(inputENUM[value] ~= nil, "Unknown key name specified")
+        self._value = inputENUM[value]
+    else
+        self._value = value
+    end
+end
+
+function KeyReader:getValue()
+    return self._value, inputENUM[self._value]
+end
+
+function KeyReader:press()
+    self._pressed = true
+
+    self._kbLockState = input.isControlLocked()
+    self._mouseLockState = input.getCursorVisible()
+
+    if self._kbLockState == false then input.lockControls(true) end
+    if self._mouseLockState == false then input.enableCursor(true) end
+
+    activateElement(self)
+end
+
+function KeyReader:confirm(key)
+    self._pressed = false
+    self._value = key
+
+    if input.isControlLocked() ~= self._kbLockState then input.lockControls(self._kbLockState) end
+    if input.getCursorVisible() ~= self._mouseLockState then input.enableCursor(self._mouseLockState) end
+
+    if self._onConfirm then self._onConfirm(self._value) end
+    deactivateElement()
+end
+
+function KeyReader:onConfirm(func)
+    assertType(func, "On Confirm Function", "function")
+    self._onConfirm = func
+end
+
+function KeyReader:renderGetTextWidth()
+    local totalWidth = render.getTextSize("\t")
+
+    if self._text and not self._pressed then
+        local text = self._text
+
+        if type(self._text) == "function" then
+            text = self._text()
+            assert(type(text) == "string", "Text function returned non string value")
+        end
+
+        if type(self._text) ~= "string" then
+            text = tostring(text)
+        end
+        local width, _ = render.getTextSize(text)
+        totalWidth = totalWidth + width
+    elseif self._pressed then
+        local width, _ = render.getTextSize("Press a key to assign")
+        totalWidth = totalWidth + width
+    end
+
+    local width, _ = render.getTextSize("[" .. (self._value and inputENUMToKey[self._value] or " ") .. "]")
+    totalWidth = totalWidth + width
+
+    return totalWidth
+end
+
+function KeyReader:render(pos, isSelected)
+    if self._pressed or isSelected then
+        local bgColor = self._pressed and COLORS.textBright or COLORS.cursor
+        render.setColor(bgColor)
+        render.drawRect(
+            windowPosX - windowMarginX,
+            windowPosY + rowHeight * pos,
+            windowWidth + windowMarginX * 2,
+            rowHeight
+        )
+    end
+
+    local textColor = self._pressed and COLORS.cursor or (isSelected and COLORS.textBright or COLORS.text)
+    render.setColor(textColor)
+
+    if self._text and not self._pressed then
+        local text = self._text
+
+        if type(self._text) == "function" then
+            text = self._text()
+            assert(type(text) == "string", "Text function returned non string value")
+        end
+
+        if type(self._text) ~= "string" then
+            text = tostring(text)
+        end
+
+        render.drawText(
+            windowPosX, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
+            text,
+            TEXT_ALIGN.LEFT
+        )
+    elseif self._pressed then
+        render.drawText(
+            windowPosX, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
+            "Press a key to assign",
+            TEXT_ALIGN.LEFT
+        )
+    end
+
+    --print(self._value, inputENUMToKey[self._value])
+    render.drawText(
+        windowPosX + windowWidth, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
+        "[" .. (self._value and inputENUMToKey[self._value] or " ") .. "]",
+        TEXT_ALIGN.RIGHT
+    )
+end
+
 --gets players display resolution and center
 local function InitDisplay()
     scrX, scrY = render.getGameResolution()
@@ -662,8 +986,14 @@ local function RenderMenu()
     _, fontHeight = render.getTextSize("TEST")
     windowHeight = (fontHeight + rowPadding) * #currentMenu:getChildren()
     rowHeight = fontHeight + rowPadding
+
     windowWidth = windowMinWidth
-    windowPosX = scrCenterX - windowMinWidth * 0.5
+
+    for i, child in ipairs(currentMenu:getChildren()) do
+        windowWidth = mathMax(windowWidth, child:renderGetTextWidth())
+    end
+
+    windowPosX = scrCenterX - windowWidth * 0.5
     windowPosY = scrCenterY - windowHeight * 0.5
 
     render.setColor(COLORS.background)

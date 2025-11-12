@@ -63,5 +63,9 @@ slider:onChange(function(value) print("On Change:", value) end)
 slider:onConfirm(function(value) print("On Confirm:", value) end)
 mainMenu:addChild(slider)
 
+local keyReader = simpleMenu:createInstance("KeyReader", { text = "Key Reader Test" })
+keyReader:onConfirm(function(value) print("On Confirm:", value) end)
+mainMenu:addChild(keyReader)
+
 enableHud(_, true)
 simpleMenu:Open(true, false)
