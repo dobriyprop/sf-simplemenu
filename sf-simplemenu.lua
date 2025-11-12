@@ -207,6 +207,7 @@ end
 --classes
 
 --Base Widget
+---@class Widget
 local Widget = class("Widget")
 SimpleMenu.classes.Widget = Widget
 
@@ -264,6 +265,7 @@ function Widget:release()
 end
 
 --Label
+---@class Label : Widget
 local Label = class("Label", Widget)
 SimpleMenu.classes.Label = Label
 
@@ -339,6 +341,7 @@ function Label:render(pos, isSelected)
 end
 
 --Menu
+---@class Menu : Label
 local Menu = class("Menu", Label)
 SimpleMenu.classes.Menu = Menu
 
@@ -472,6 +475,7 @@ function Menu:render(pos, isSelected)
 end
 
 --Button
+---@class Button : Label
 local Button = class("Button", Label)
 SimpleMenu.classes.Button = Button
 
@@ -612,7 +616,8 @@ function Button:render(pos, isSelected)
     end
 end
 
---value slider
+--Value slider
+---@class Slider: Label
 local Slider = class("Slider", Label)
 SimpleMenu.classes.Slider = Slider
 
@@ -835,7 +840,8 @@ function Slider:render(pos, isSelected)
     end
 end
 
---value slider
+--Key reader
+---@class KeyReader : Label
 local KeyReader = class("KeyReader", Label)
 SimpleMenu.classes.KeyReader = KeyReader
 
