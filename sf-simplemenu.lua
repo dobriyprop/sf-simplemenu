@@ -12,7 +12,6 @@ local tableRemove = table.remove
 
 local stringFormat = string.format
 
-
 local inputENUM = table.copy(KEY) --table of ENUMs to unify keyboard and mouse input codes
 --define mouse input codes
 inputENUM.MOUSE1 = MOUSE.MOUSE1
@@ -30,8 +29,6 @@ local inputENUMToKey = {}
 for k, v in pairs(inputENUM) do
     inputENUMToKey[v] = k
 end
-
-printTable(inputENUMToKey)
 
 local menuInputENUM = { --ENUMs for menu actions
     up = 1,
@@ -412,8 +409,8 @@ end
 
 function Menu:press()
     pushInputStack(self._inputHandler)
-    table.insert(menuStack, self)
-    table.insert(cursorStack, cursor)
+    tableInsert(menuStack, self)
+    tableInsert(cursorStack, cursor)
     cursor = 1
 end
 
@@ -428,6 +425,7 @@ function Menu:back()
 end
 
 function Menu:addChild(child)
+    assertType(child, "Child instance", "table")
     self._children[#self._children + 1] = child
 end
 
@@ -766,7 +764,7 @@ function Slider:renderGetTextWidth()
     if self._value then
         local width, _ = render.getTextSize(
             "[" ..
-            (self._precision and string.format("%.0" .. self._precision .. "f", self._value) or tostring(self._value))
+            (self._precision and stringFormat("%.0" .. self._precision .. "f", self._value) or tostring(self._value))
             .. "]"
         )
         totalWidth = totalWidth + width
@@ -813,7 +811,7 @@ function Slider:render(pos, isSelected)
         render.drawText(
             windowPosX + windowWidth, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
             "[" ..
-            (self._precision and string.format("%.0" .. self._precision .. "f", self._value) or tostring(self._value))
+            (self._precision and stringFormat("%.0" .. self._precision .. "f", self._value) or tostring(self._value))
             .. "]",
             TEXT_ALIGN.RIGHT
         )
