@@ -408,10 +408,12 @@ function Menu:initialize(tbl)
 end
 
 function Menu:press()
-    pushInputStack(self._inputHandler)
-    tableInsert(menuStack, self)
-    tableInsert(cursorStack, cursor)
-    cursor = 1
+    if #self._children > 0 then
+        pushInputStack(self._inputHandler)
+        tableInsert(menuStack, self)
+        tableInsert(cursorStack, cursor)
+        cursor = 1
+    end
 end
 
 function Menu:release()
