@@ -69,6 +69,15 @@ local menuInputsAutoRepeat = {
     [menuInputENUM.back] = false,
 }
 
+local menuInputState = {
+    [menuInputENUM.up] = false,
+    [menuInputENUM.down] = false,
+    [menuInputENUM.left] = false,
+    [menuInputENUM.right] = false,
+    [menuInputENUM.enter] = false,
+    [menuInputENUM.back] = false,
+}
+
 local COLORS = {
     cursor = Color(5, 55, 215),
     text = Color(215, 215, 215),
@@ -148,6 +157,10 @@ end
 
 --input processing function with autorepeat functionality
 local function processInput(pressed, key)
+    if menuInputs[key] then
+        menuInputState[menuInputs[key]] = pressed
+        print(menuInputs[key], menuInputState[menuInputs[key]])
+    end
     --if new input arrived be it on press or release - stop all autorepeat timers
     autoRepeatStop()
 
@@ -205,7 +218,7 @@ function Widget:initialize(tbl)
 
     if tbl then
         assertType(tbl, "Table of arguments", "table")
-        assertType(tbl.name, "Text", { "string", "nil" })
+        assertType(tbl.name, "Name", { "string", "nil" })
         self._name = tbl.name and tbl.name or nil
     else
         self._name = nil
@@ -339,7 +352,9 @@ local function menuInputHandler(pressed, key)
     local cursorChild = menuChildren[cursor]
 
     if pressed == true then -- true for inputPressed hook
-        if menuInputCode == menuInputENUM.up or menuInputCode == menuInputENUM.down then
+        if (menuInputCode == menuInputENUM.up or menuInputCode == menuInputENUM.down) and
+            not (menuInputState[menuInputENUM.enter] or menuInputState[menuInputENUM.back])
+        then
             local direction = menuInputCode == menuInputENUM.up and -1 or 1
             local newCursor = cursor
 
@@ -1071,11 +1086,11 @@ end
 
 --initializes and opens menu window
 function SimpleMenu:Open(lockControls, enableCursor)
-    assertType(lockControls, "Lock Controls", "boolean")
-    assertType(enableCursor, "Enable Cursor", "boolean")
+    assertType(lockControls, "Lock Controls", { "boolean", "nil" })
+    assertType(enableCursor, "Enable Cursor", { "boolean", "nil" })
 
-    input.enableCursor(enableCursor and enableCursor or false)
-    input.lockControls(lockControls and lockControls or false)
+    input.lockControls((lockControls and input.canLockControls()) and lockControls or false)
+    input.enableCursor((enableCursor and not input.getCursorVisible()) and enableCursor or false)
 
     InitDisplay()
 
