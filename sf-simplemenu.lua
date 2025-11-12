@@ -1057,6 +1057,16 @@ function SimpleMenu:autoRepeat(enabled)
     end
 end
 
+function SimpleMenu:onOpen(func)
+    assertType(func, "Function", { "function", "nil" })
+    SimpleMenu.onOpen = func
+end
+
+function SimpleMenu:onClose(func)
+    assertType(func, "Function", { "function", "nil" })
+    SimpleMenu.onClose = func
+end
+
 --initializes and opens menu window
 function SimpleMenu:Open(lockControls, enableCursor)
     assertType(lockControls, "Lock Controls", "boolean")
@@ -1082,6 +1092,8 @@ function SimpleMenu:Open(lockControls, enableCursor)
     hook.add("inputReleased", "SimpleMenu Input Read", function(key)
         processInput(false, key)
     end)
+
+    if SimpleMenu.onOpen then SimpleMenu.onOpen() end
 end
 
 --closes menu window
@@ -1090,6 +1102,8 @@ function SimpleMenu:Close()
     input.lockControls(false)
     hook.remove("drawhud", "SimpleMenu Render")
     hook.remove("inputPressed", "SimpleMenu Input Read")
+
+    if SimpleMenu.onClose then SimpleMenu.onClose() end
 end
 
 return SimpleMenu
