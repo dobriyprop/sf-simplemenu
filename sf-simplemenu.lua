@@ -12,6 +12,8 @@ local tableRemove = table.remove
 
 local stringFormat = string.format
 
+local curtime = timer.curtime
+
 local inputENUM = table.copy(KEY) --table of ENUMs to unify keyboard and mouse input codes
 --define mouse input codes
 inputENUM.MOUSE1 = MOUSE.MOUSE1
@@ -90,6 +92,8 @@ local lastLockControl = 0
 local instances = {}
 
 local cursor = 1
+local cursorLastChangeTime = 0
+local descriptionDelay = 2
 local autoRepeatAllowed = true
 local cursorStack = {}
 local menuStack = {}
@@ -221,9 +225,10 @@ function Widget:initialize(tbl)
     if tbl then
         assertType(tbl, "Table of arguments", "table")
         assertType(tbl.name, "Name", { "string", "nil" })
-        self._name = tbl.name and tbl.name or nil
+        self._name = tbl.name or nil
+        assertType(tbl.description, "Description", { "string", "nil" })
+        self._description = tbl.description or nil
     else
-        self._name = nil
     end
 end
 
@@ -232,12 +237,22 @@ function Widget:isPressable()
 end
 
 function Widget:isSelectable()
-    return self._pressable
+    return self._selectable
 end
 
 function Widget:setName(name)
-    assertType(name, "Name", "string")
+    assertType(name, "Name", { "string", "nil" })
     self._name = name
+end
+
+function Widget:setDescription(desc)
+    assertType(desc, "Description", { "string", "nil" })
+    assert(self._selectable, "Can't add description to unselectable element")
+    self._description = desc
+end
+
+function Widget:getDescription()
+    return self._description
 end
 
 function Widget:getName()
@@ -263,6 +278,17 @@ end
 
 function Widget:release()
     --dummy function
+end
+
+function Widget:renderDescription(pos)
+    if self._description == nil then return end
+    local textX, textY = render.getTextSize(self._description)
+    local descPosX = windowPosX + windowWidth + windowMarginX
+    local descPosY = windowPosY + rowHeight * pos - windowMarginY + rowHeight * 0.5 - textY * 0.5
+    render.setColor(COLORS.cursor)
+    render.drawRect(descPosX, descPosY, textX + windowMarginX * 2, textY + windowMarginY * 2)
+    render.setColor(COLORS.text)
+    render.drawText(descPosX + windowMarginX, descPosY + windowMarginY, self._description, TEXT_ALIGN.LEFT)
 end
 
 --Label
@@ -371,13 +397,16 @@ local function menuInputHandler(pressed, key)
 
             if (direction > 0 and newCursor <= #menuChildren) or (direction < 0 and newCursor >= 1) then
                 cursor = newCursor
+                cursorLastChangeTime = curtime()
             end
         elseif menuInputCode == menuInputENUM.enter and cursorChild:isPressable() then
             autoRepeatStop()
             cursorChild:press()
+            cursorLastChangeTime = -1
         elseif menuInputCode == menuInputENUM.back then
             autoRepeatStop()
             cursor = 1
+            cursorLastChangeTime = -1
             if menu == root then
                 SimpleMenu:Close()
             else
@@ -392,6 +421,7 @@ local function menuInputHandler(pressed, key)
 end
 
 function Menu:initialize(tbl)
+    Label.initialize(self, tbl)
     self._type = "Menu"
     self._pressable = true
     self._selectable = true
@@ -486,6 +516,7 @@ local Button = class("Button", Label)
 SimpleMenu.classes.Button = Button
 
 function Button:initialize(tbl)
+    Label.initialize(self, tbl)
     self._type = "Button"
     self._pressable = true
     self._selectable = true
@@ -646,6 +677,7 @@ local function sliderInputHandler(pressed, key)
 end
 
 function Slider:initialize(tbl)
+    Label.initialize(self, tbl)
     self._type = "Slider"
     self._pressable = true
     self._selectable = true
@@ -654,30 +686,36 @@ function Slider:initialize(tbl)
     if tbl then
         assertType(tbl, "Table of arguments", "table")
 
-        assertType(text, "Text", { "string", "function", "nil" })
-        self._text = (tbl and tbl.text) and tbl.text or nil
-        assertType(text, "Precision", { "number", "nil" })
-        self._precision = (tbl and tbl.precision) and tbl.precision or nil
-        assertType(text, "Min Calue", { "number", "nil" })
-        self._minValue = (tbl and tbl.min) and tbl.min or nil
-        assertType(text, "Mac Value", { "number", "nil" })
-        self._maxValue = (tbl and tbl.max) and tbl.max or nil
-        assertType(text, "Increment/Decrement Step", { "number", "nil" })
-        self._step = (tbl and tbl.step) and tbl.step or 1
+        --[[ assertType(text, "Text", { "string", "function", "nil" })
+        self._text = (tbl and tbl.text) and tbl.text or nil ]]
+        assertType(tbl.precision, "Precision", { "number", "nil" })
+        self._precision = tbl.precision or nil
+        assertType(tbl.min, "Min Calue", { "number", "nil" })
+        self._minValue = tbl.min or nil
+        assertType(tbl.max, "Mac Value", { "number", "nil" })
+        self._maxValue = tbl.max or nil
+        assertType(tbl.step, "Increment/Decrement Step", { "number", "nil" })
+        self._step = tbl.step or 1
+        assertType(tbl.units, "Units", { "string", "nil" })
+        self._units = tbl.units or nil
 
         assertType(text, "Value", { "number", "nil" })
-        local value = (tbl and tbl.value) and tbl.value or 0
+        local value = tbl.value or 0
         if self._minValue then value = mathMax(self._minValue, value) end
         if self._maxValue then value = mathMin(self._maxValue, value) end
         self._value = value
     else
-        self._text = nil
         self._precision = nil
         self._minValue = nil
         self._maxValue = nil
         self._step = 1
         self._value = 0
+        self._unit = nil
     end
+
+    self._valuetext = "[" ..
+        (self._precision and stringFormat("%.0" .. self._precision .. "f", self._value) or tostring(self._value))
+        .. " " .. (self._units or "") .. "]"
 
     self._inputHandler = sliderInputHandler
 end
@@ -692,13 +730,24 @@ function Slider:getValue()
 end
 
 function Slider:setPrecision(precision)
-    assertType(value, "Precision", { "number", "nil" })
+    assertType(precision, "Precision", { "number", "nil" })
     if precision then
         assert(precision >= 0, "Precision should be 0 or more")
         self._precision = precision
     else
         self._precision = nil
     end
+    self._valuetext = "[" ..
+        (self._precision and stringFormat("%.0" .. self._precision .. "f", self._value) or tostring(self._value))
+        .. " " .. (self._units or "") .. "]"
+end
+
+function Slider:setUnits(units)
+    assertType(units, "Precision", { "string", "nil" })
+    self._units = units
+    self._valuetext = "[" ..
+        (self._precision and stringFormat("%.0" .. self._precision .. "f", self._value) or tostring(self._value))
+        .. " " .. (self._units or "") .. "]"
 end
 
 function Slider:setMinValue(minValue)
@@ -709,6 +758,9 @@ function Slider:setMinValue(minValue)
     else
         self._minValue = nil
     end
+    self._valuetext = "[" ..
+        (self._precision and stringFormat("%.0" .. self._precision .. "f", self._value) or tostring(self._value))
+        .. " " .. (self._units or "") .. "]"
 end
 
 function Slider:setMaxValue(maxValue)
@@ -719,6 +771,9 @@ function Slider:setMaxValue(maxValue)
     else
         self._minValue = nil
     end
+    self._valuetext = "[" ..
+        (self._precision and stringFormat("%.0" .. self._precision .. "f", self._value) or tostring(self._value))
+        .. " " .. (self._units or "") .. "]"
 end
 
 function Slider:setStep(step)
@@ -740,6 +795,10 @@ function Slider:change(direction)
     if self._minValue then self._value = mathMax(self._value, self._minValue) end
     if self._maxValue then self._value = mathMin(self._value, self._maxValue) end
 
+    self._valuetext = "[" ..
+        (self._precision and stringFormat("%.0" .. self._precision .. "f", self._value) or tostring(self._value))
+        .. " " .. (self._units or "") .. "]"
+
     if self._onChange and self._value ~= oldValue then self._onChange(self._value) end
 end
 
@@ -756,6 +815,10 @@ function Slider:cancel()
     self._pressed = false
     self._value = self._oldValue
     self._oldValue = nil
+
+    self._valuetext = "[" ..
+        (self._precision and stringFormat("%.0" .. self._precision .. "f", self._value) or tostring(self._value))
+        .. " " .. (self._units or "") .. "]"
 
     deactivateElement()
 end
@@ -790,11 +853,7 @@ function Slider:renderGetTextWidth()
     end
 
     if self._value then
-        local width, _ = render.getTextSize(
-            "[" ..
-            (self._precision and stringFormat("%.0" .. self._precision .. "f", self._value) or tostring(self._value))
-            .. "]"
-        )
+        local width, _ = render.getTextSize(self._valuetext)
         totalWidth = totalWidth + width
     end
 
@@ -838,9 +897,7 @@ function Slider:render(pos, isSelected)
     if self._value then
         render.drawText(
             windowPosX + windowWidth, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
-            "[" ..
-            (self._precision and stringFormat("%.0" .. self._precision .. "f", self._value) or tostring(self._value))
-            .. "]",
+            self._valuetext,
             TEXT_ALIGN.RIGHT
         )
     end
@@ -860,6 +917,7 @@ local function keyReaderInputHandler(pressed, key)
 end
 
 function KeyReader:initialize(tbl)
+    Label.initialize(self, tbl)
     self._type = "KeyReader"
     self._pressable = true
     self._selectable = true
@@ -1036,8 +1094,13 @@ local function RenderMenu()
     )
 
     for i, child in ipairs(currentMenu:getChildren()) do
-        isSelected = i == cursor and child:isSelectable()
-        child:render(i - 1, isSelected)
+        local isSelected = i == cursor and child:isSelectable()
+        local pos = i - 1
+
+        child:render(pos, isSelected)
+        if isSelected and cursorLastChangeTime >= 0 and (cursorLastChangeTime + descriptionDelay - curtime()) < 0 then
+            child:renderDescription(pos)
+        end
     end
 end
 
@@ -1090,6 +1153,13 @@ function SimpleMenu:autoRepeat(enabled)
     end
 end
 
+function SimpleMenu:setDescriptionDelay(number)
+    assertType(number, "Description Delay", "number")
+    assert(number > 0, "Description Delay must be bigger or equal to 0")
+
+    descriptionDelay = number
+end
+
 function SimpleMenu:onOpen(func)
     assertType(func, "Function", { "function", "nil" })
     SimpleMenu.onOpen = func
@@ -1109,12 +1179,12 @@ function SimpleMenu:Open(lockControls, enableCursor)
         if not input.canLockControls() then
             print(
                 "Can't lock controls yet. Please wait for " ..
-                mathRound(lastLockControl + 10 - timer.curtime())
+                mathRound(lastLockControl + 10 - curtime())
                 .. " seconds and try again. Blame Sparky for this 10 sec cooldown."
             )
             return
         else
-            lastLockControl = timer.curtime()
+            lastLockControl = curtime()
         end
     end
 
