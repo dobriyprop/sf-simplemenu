@@ -445,9 +445,14 @@ function Menu:back()
     cursor = tableRemove(cursorStack)
 end
 
-function Menu:addChild(child)
+function Menu:addChild(child, position)
     assertType(child, "Child instance", "table")
-    self._children[#self._children + 1] = child
+    if position then
+        assertType(position, "Position", "number")
+        tableInsert(self._children, position, child)
+    else
+        tableInsert(self._children, child)
+    end
 end
 
 function Menu:getChildren()
