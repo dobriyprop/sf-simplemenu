@@ -468,7 +468,14 @@ function Menu:press()
         tableInsert(menuStack, self)
         tableInsert(cursorStack, cursor)
         cursor = 1
+
+        if self._onPress then self._onPress() end
     end
+end
+
+function Menu:onPress(func)
+    assertType(func, "On Press Function", { "function", "nil" })
+    self._onPress = func
 end
 
 function Menu:release()
@@ -558,12 +565,12 @@ function Button:release()
 end
 
 function Button:onPress(func)
-    assertType(func, "On Press Function", "function")
+    assertType(func, "On Press Function", { "function", "nil" })
     self._onPress = func
 end
 
 function Button:onRelease(func)
-    assertType(func, "On Release Function", "function")
+    assertType(func, "On Release Function", { "function", "nil" })
     self._onRelease = func
 end
 
