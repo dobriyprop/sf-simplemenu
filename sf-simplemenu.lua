@@ -121,13 +121,17 @@ local SimpleMenu = {
 }
 
 --for checking value types
+---@param value any
+---@param valueName string
+---@param expectedTypes string | string[]
+---@return nil
 local function assertType(value, valueName, expectedTypes)
     if type(expectedTypes) == "string" then
         assert(
             type(value) == expectedTypes,
             valueName .. " value should be \"" .. expectedTypes .. "\" type, not \"" .. type(value) .. "\""
         )
-    elseif type(expectedType) == "table" then
+    elseif type(expectedTypes) == "table" then
         --builds expected types string from table and asserts incorrect entries in expected types table
         local expectedTypesString = ""
         for i, expectedType in ipairs(expectedTypes) do
