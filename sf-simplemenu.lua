@@ -85,6 +85,8 @@ local COLORS = {
     background = Color(0, 0, 0, 210),
 }
 
+local lastLockControl = 0
+
 local instances = {}
 
 local cursor = 1
@@ -1004,6 +1006,8 @@ end
 local function RenderMenu()
     local currentMenu = menuStack[#menuStack]
 
+    if currentMenu == nil then return end
+
     render.setFont(font)
     _, fontHeight = render.getTextSize("TEST")
     windowHeight = (fontHeight + rowPadding) * #currentMenu:getChildren()
@@ -1096,8 +1100,17 @@ function SimpleMenu:Open(lockControls, enableCursor)
     assertType(lockControls, "Lock Controls", { "boolean", "nil" })
     assertType(enableCursor, "Enable Cursor", { "boolean", "nil" })
 
-    if lockControls and not input.canLockControls() then
-        print("Can't lock controls yet. Please wait for a few seconds and try again")
+    if lockControls then
+        if not input.canLockControls() then
+            print(
+                "Can't lock controls yet. Please wait for " ..
+                mathRound(lastLockControl + 10 - timer.curtime())
+                .. " seconds and try again. Blame Sparky for this 10 sec cooldown."
+            )
+            return
+        else
+            lastLockControl = timer.curtime()
+        end
     end
 
     if SimpleMenu.onOpen then SimpleMenu.onOpen() end
