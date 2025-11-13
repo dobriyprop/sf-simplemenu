@@ -6,6 +6,8 @@ local mathMin = math.min
 local mathMax = math.max
 local mathClamp = math.clamp
 local mathRound = math.round
+local mathFloor = math.floor
+local mathCeil = math.ceil
 
 local tableInsert = table.insert
 local tableRemove = table.remove
@@ -720,9 +722,16 @@ function Slider:initialize(tbl)
     self._inputHandler = sliderInputHandler
 end
 
+function Slider:_genValueText()
+    self._valuetext = "[" ..
+        (self._precision and stringFormat("%.0" .. self._precision .. "f", self._value) or tostring(self._value))
+        .. " " .. (self._units or "") .. "]"
+end
+
 function Slider:setValue(value)
     assertType(value, "Value", "number")
     self._value = value
+    self._genValueText(self)
 end
 
 function Slider:getValue()
@@ -737,17 +746,13 @@ function Slider:setPrecision(precision)
     else
         self._precision = nil
     end
-    self._valuetext = "[" ..
-        (self._precision and stringFormat("%.0" .. self._precision .. "f", self._value) or tostring(self._value))
-        .. " " .. (self._units or "") .. "]"
+    self._genValueText(self)
 end
 
 function Slider:setUnits(units)
     assertType(units, "Precision", { "string", "nil" })
     self._units = units
-    self._valuetext = "[" ..
-        (self._precision and stringFormat("%.0" .. self._precision .. "f", self._value) or tostring(self._value))
-        .. " " .. (self._units or "") .. "]"
+    self._genValueText(self)
 end
 
 function Slider:setMinValue(minValue)
@@ -758,9 +763,7 @@ function Slider:setMinValue(minValue)
     else
         self._minValue = nil
     end
-    self._valuetext = "[" ..
-        (self._precision and stringFormat("%.0" .. self._precision .. "f", self._value) or tostring(self._value))
-        .. " " .. (self._units or "") .. "]"
+    self._genValueText(self)
 end
 
 function Slider:setMaxValue(maxValue)
@@ -771,9 +774,7 @@ function Slider:setMaxValue(maxValue)
     else
         self._minValue = nil
     end
-    self._valuetext = "[" ..
-        (self._precision and stringFormat("%.0" .. self._precision .. "f", self._value) or tostring(self._value))
-        .. " " .. (self._units or "") .. "]"
+    self._genValueText(self)
 end
 
 function Slider:setStep(step)
@@ -795,9 +796,7 @@ function Slider:change(direction)
     if self._minValue then self._value = mathMax(self._value, self._minValue) end
     if self._maxValue then self._value = mathMin(self._value, self._maxValue) end
 
-    self._valuetext = "[" ..
-        (self._precision and stringFormat("%.0" .. self._precision .. "f", self._value) or tostring(self._value))
-        .. " " .. (self._units or "") .. "]"
+    self._genValueText(self)
 
     if self._onChange and self._value ~= oldValue then self._onChange(self._value) end
 end
@@ -805,6 +804,8 @@ end
 function Slider:confirm()
     self._pressed = false
     self._oldValue = nil
+
+    self._genValueText(self)
 
     if self._onConfirm then self._onConfirm(self._value) end
 
@@ -816,9 +817,7 @@ function Slider:cancel()
     self._value = self._oldValue
     self._oldValue = nil
 
-    self._valuetext = "[" ..
-        (self._precision and stringFormat("%.0" .. self._precision .. "f", self._value) or tostring(self._value))
-        .. " " .. (self._units or "") .. "]"
+    self._genValueText(self)
 
     deactivateElement()
 end
@@ -1104,6 +1103,23 @@ local function RenderMenu()
     end
 end
 
+local function mouseHandler(x, y)
+    if
+        x < windowPosX or
+        x > windowPosX + windowWidth or
+        y < windowPosY or
+        y > windowPosY + windowHeight
+    then
+        cursorLastChangeTime = -1
+        return
+    end
+
+    local lastCursor = cursor
+    cursor = mathClamp(mathFloor((y - windowPosY) / rowHeight) + 1, 1, #menuStack[#menuStack]:getChildren())
+
+    if cursor ~= lastCursor then cursorLastChangeTime = curtime() end
+end
+
 --sets font for menu
 function SimpleMenu:setFont(newFont)
     assertType(newFont, "Font", "string")
@@ -1199,9 +1215,19 @@ function SimpleMenu:Open(lockControls, enableCursor)
     menuStack = { root }
     inputStack = { root._inputHandler }
 
-    hook.add("drawhud", "SimpleMenu Render", function()
-        RenderMenu()
-    end)
+    if enableCursor then
+        local getCursor = input.getCursorPos
+        local lastX, lastY = getCursor()
+        hook.add("think", "SimpleMenu Mouse Read", function()
+            local x, y = getCursor()
+            if x ~= lastX or y ~= lastY then
+                mouseHandler(x, y)
+                lastX, lastY = x, y
+            end
+        end)
+    end
+
+    hook.add("drawhud", "SimpleMenu Render", RenderMenu)
 
     hook.add("inputPressed", "SimpleMenu Input Read", function(key)
         processInput(true, key)
@@ -1218,6 +1244,8 @@ function SimpleMenu:Close()
     input.lockControls(false)
     hook.remove("drawhud", "SimpleMenu Render")
     hook.remove("inputPressed", "SimpleMenu Input Read")
+    hook.remove("inputReleased", "SimpleMenu Input Read")
+    hook.remove("think", "SimpleMenu Mouse Read")
 
     if SimpleMenu.onClose then SimpleMenu.onClose() end
 end
