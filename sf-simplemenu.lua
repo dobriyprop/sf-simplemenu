@@ -159,7 +159,6 @@ end
 local function processInput(pressed, key)
     if menuInputs[key] then
         menuInputState[menuInputs[key]] = pressed
-        print(menuInputs[key], menuInputState[menuInputs[key]])
     end
     --if new input arrived be it on press or release - stop all autorepeat timers
     autoRepeatStop()
@@ -874,7 +873,7 @@ function KeyReader:initialize(tbl)
 end
 
 function KeyReader:setValue(value)
-    assertType(value, "Value", { "string", "number" })
+    assertType(value, "Value", { "string", "number", "nil" })
 
     if type(value) == string then
         assert(inputENUM[value] ~= nil, "Unknown key name specified")
@@ -890,29 +889,31 @@ end
 
 function KeyReader:press()
     self._pressed = true
+    --[[
+     if not input.canLockControls() then return end
 
     self._kbLockState = input.isControlLocked()
     self._mouseLockState = input.getCursorVisible()
 
     if self._kbLockState == false then input.lockControls(true) end
     if self._mouseLockState == false then input.enableCursor(true) end
-
+ ]]
     activateElement(self)
 end
 
 function KeyReader:confirm(key)
     self._pressed = false
     self._value = key
-
+    --[[
     if input.isControlLocked() ~= self._kbLockState then input.lockControls(self._kbLockState) end
     if input.getCursorVisible() ~= self._mouseLockState then input.enableCursor(self._mouseLockState) end
-
+ ]]
     if self._onConfirm then self._onConfirm(self._value) end
     deactivateElement()
 end
 
 function KeyReader:onConfirm(func)
-    assertType(func, "On Confirm Function", "function")
+    assertType(func, "On Confirm Function", { "function", "nil" })
     self._onConfirm = func
 end
 
@@ -1095,6 +1096,12 @@ function SimpleMenu:Open(lockControls, enableCursor)
     assertType(lockControls, "Lock Controls", { "boolean", "nil" })
     assertType(enableCursor, "Enable Cursor", { "boolean", "nil" })
 
+    if lockControls and not input.canLockControls() then
+        print("Can't lock controls yet. Please wait for a few seconds and try again")
+    end
+
+    if SimpleMenu.onOpen then SimpleMenu.onOpen() end
+
     input.lockControls((lockControls and input.canLockControls()) and lockControls or false)
     input.enableCursor((enableCursor and not input.getCursorVisible()) and enableCursor or false)
 
@@ -1115,8 +1122,6 @@ function SimpleMenu:Open(lockControls, enableCursor)
     hook.add("inputReleased", "SimpleMenu Input Read", function(key)
         processInput(false, key)
     end)
-
-    if SimpleMenu.onOpen then SimpleMenu.onOpen() end
 end
 
 --closes menu window
