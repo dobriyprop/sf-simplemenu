@@ -11,7 +11,7 @@ local mathCeil = math.ceil
 
 local tableInsert = table.insert
 local tableRemove = table.remove
-local tableRemoveByValue = table.RemoveByValue
+local tableRemoveByValue = table.removeByValue
 
 local stringFormat = string.format
 
@@ -29,11 +29,17 @@ inputENUM.MWHEELDOWN = MOUSE.MWHEELDOWN
 
 --create a reverse key ENUM table to get Key name by ENUM code
 
-local inputENUMToKey = {}
+local function inverseTable(tbl)
+    local invtbl = {}
 
-for k, v in pairs(inputENUM) do
-    inputENUMToKey[v] = k
+    for k, v in pairs(tbl) do
+        invtbl[v] = k
+    end
+
+    return invtbl
 end
+
+local inputENUMToKey = inverseTable(inputENUM)
 
 local menuInputENUM = { --ENUMs for menu actions
     up = 1,
@@ -461,7 +467,7 @@ local function menuInputHandler(pressed, key)
 
     local menuInputCode = menuInputs[key]
     local menu = menuStack[#menuStack]
-    local menuChildren = menu:getChildrenOrder()
+    local menuChildren = menu:getOrder()
     local cursorChild = menuChildren[cursor]
 
     if pressed == true then -- true for inputPressed hook
@@ -484,6 +490,7 @@ local function menuInputHandler(pressed, key)
             end
         elseif menuInputCode == menuInputENUM.enter and cursorChild:isPressable() then
             autoRepeatStop()
+            menu:moveDownRenderOrder(cursorChild)
             cursorChild:press()
             cursorLastChangeTime = -1
         elseif menuInputCode == menuInputENUM.back then
@@ -531,7 +538,9 @@ function Menu:initialize(tbl)
         )
 
         self._children = {}
-        self._childrenOrder = {}
+        self._order = {}
+        self._orderInverse = {}
+        self._orderRender = {}
         if tbl.children then
             for i, child in ipairs(tbl.children) do
                 self.addChild(child, i)
@@ -540,14 +549,16 @@ function Menu:initialize(tbl)
     else
         self._text = nil
         self._children = {}
-        self._childrenOrder = {}
+        self._order = {}
+        self._orderInverse = {}
+        self._orderRender = {}
     end
 
     self._inputHandler = menuInputHandler
 end
 
 function Menu:press()
-    if #self._childrenOrder > 0 then
+    if #self._order > 0 then
         pushInputStack(self._inputHandler)
         tableInsert(menuStack, self)
         tableInsert(cursorStack, cursor)
@@ -572,26 +583,69 @@ function Menu:back()
     cursor = tableRemove(cursorStack)
 end
 
+function Menu:_genInverseOrder()
+    self._orderInverse = inverseTable(self._order)
+end
+
+function Menu:_addOrder(child, position)
+    if position then
+        tableInsert(self._order, mathClamp(position, 1, #self._order + 1), child)
+        tableInsert(self._orderRender, mathClamp(position, 1, #self._orderRender + 1), child)
+    else
+        tableInsert(self._order, child)
+        tableInsert(self._orderRender, child)
+    end
+    self._genInverseOrder(self)
+end
+
+function Menu:_removeOrder(child)
+    tableRemoveByValue(self._order, child)
+    tableRemoveByValue(self._orderRender, child)
+    self._genInverseOrder(self)
+end
+
+function Menu:moveDownRenderOrder(child)
+    assertType(child, "Child instance", "table")
+    assert(
+        child.getClassName and SimpleMenu.classes[child:getClassName()] ~= nil,
+        "Specified child does not belong to any of registered classes."
+    )
+    assert(self:getChildren()[child:getID()] ~= nil, "Specified Element is not a Child Element of this Menu")
+
+    tableRemoveByValue(self._orderRender, child)
+    tableInsert(self._orderRender, child)
+    --[[ debug for render order
+    for i, child in ipairs(self._orderRender) do
+        print(i, child:getClassName(), child:getName())
+    end
+ ]]
+end
+
 function Menu:addChild(child, position)
     if position then
         assertType(position, "Child Order Position", "number")
-        table.insert(self._childrenOrder, mathClamp(position, 1, #self._childrenOrder + 1), child)
+        self._addOrder(self, child, position)
     else
-        table.insert(self._childrenOrder, child)
+        self._addOrder(self, child)
     end
 
     Label.addChild(self, child)
 end
 
 function Menu:removeChild(child)
-    tableRemoveByValue(self._childrenOrder, child)
+    self:_removeOrder(self, child)
     Label.removeChild(self, child)
 end
 
-function Menu:getChildrenOrder()
-    return self._childrenOrder
+function Menu:getOrder()
+    return self._order, self._orderInverse, self._orderRender
 end
 
+--[[
+function Menu:getRenderOrder()
+    return self._order
+end
+ ]]
 function Menu:renderGetTextWidth()
     local totalWidth = render.getTextSize("\t")
 
@@ -787,8 +841,6 @@ function Slider:initialize(tbl)
     if tbl then
         assertType(tbl, "Table of arguments", "table")
 
-        --[[ assertType(text, "Text", { "string", "function", "nil" })
-        self._text = (tbl and tbl.text) and tbl.text or nil ]]
         assertType(tbl.precision, "Precision", { "number", "nil" })
         self._precision = tbl.precision or nil
         assertType(tbl.min, "Min Calue", { "number", "nil" })
@@ -1157,19 +1209,19 @@ end
 
 --renders everything
 local function RenderMenu()
-    local currentMenu = menuStack[#menuStack]
-    if currentMenu == nil then return end
+    local menu = menuStack[#menuStack]
+    if menu == nil then return end
 
-    local currentMenuChildren = currentMenu:getChildrenOrder()
+    local menuOrder, menuOrderInverse, menuRenderOrder = menu:getOrder()
 
     render.setFont(font)
     _, fontHeight = render.getTextSize("TEST")
-    windowHeight = (fontHeight + rowPadding) * #currentMenuChildren
+    windowHeight = (fontHeight + rowPadding) * #menuOrder
     rowHeight = fontHeight + rowPadding
 
     windowWidth = windowMinWidth
 
-    for i, child in ipairs(currentMenuChildren) do
+    for i, child in ipairs(menuOrder) do
         windowWidth = mathMax(windowWidth, child:renderGetTextWidth())
     end
 
@@ -1184,9 +1236,9 @@ local function RenderMenu()
         windowHeight + windowMarginY * 2
     )
 
-    for i, child in ipairs(currentMenuChildren) do
-        local isSelected = i == cursor and child:isSelectable()
-        local pos = i - 1
+    for i, child in ipairs(menuRenderOrder) do
+        local isSelected = menuOrderInverse[child] == cursor and child:isSelectable()
+        local pos = menuOrderInverse[child] - 1
 
         child:render(pos, isSelected)
         if isSelected and cursorLastChangeTime >= 0 and (cursorLastChangeTime + descriptionDelay - curtime()) < 0 then
@@ -1207,7 +1259,7 @@ local function mouseHandler(x, y)
     end
 
     local lastCursor = cursor
-    cursor = mathClamp(mathFloor((y - windowPosY) / rowHeight) + 1, 1, #menuStack[#menuStack]:getChildrenOrder())
+    cursor = mathClamp(mathFloor((y - windowPosY) / rowHeight) + 1, 1, #menuStack[#menuStack]:getOrder())
 
     if cursor ~= lastCursor then cursorLastChangeTime = curtime() end
 end
