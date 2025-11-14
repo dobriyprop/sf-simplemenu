@@ -65,7 +65,7 @@ local slider = simpleMenu:createInstance("Slider",
         step = 0.05,
         min = 0,
         max = 10,
-        description = "testtesttesttesttesttesttest\ntest\ntest\ntest\ntest\ntest\ntest\ntest\ntest"
+        description = "testtesttesttesttesttesttest\ntest\ntest\ntest\ntest\ntest\ntest\ntest\ntest",
     })
 slider:onChange(function(value) print("On Change:", value) end)
 slider:onConfirm(function(value) print("On Confirm:", value) end)

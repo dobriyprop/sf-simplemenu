@@ -11,6 +11,7 @@ local mathCeil = math.ceil
 
 local tableInsert = table.insert
 local tableRemove = table.remove
+local tableRemoveByValue = table.RemoveByValue
 
 local stringFormat = string.format
 
@@ -91,7 +92,8 @@ local COLORS = {
 
 local lastLockControl = 0
 
-local instances = {}
+local instanceIDCounter = 0
+--local instances = {}
 
 local cursor = 1
 local cursorLastChangeTime = 0
@@ -224,17 +226,28 @@ SimpleMenu.classes.Widget = Widget
 
 --initialize base widget
 function Widget:initialize(tbl)
-    self._type = "Widget"
+    self._className = "Widget"
     self._pressable = false
     self._selectable = false
+    self._canParent = true
+    self._canBeParent = false
 
     if tbl then
         assertType(tbl, "Table of arguments", "table")
+        assertType(tbl.id, "ID", { "string" })
+        self._id = tbl.id
         assertType(tbl.name, "Name", { "string", "nil" })
         self._name = tbl.name or nil
         assertType(tbl.description, "Description", { "string", "nil" })
         self._description = tbl.description or nil
-    else
+        assertType(tbl.parent, "Parent", { "table", "nil" })
+        if tbl.parent then
+            assert(
+                tbl.parent.getClass and SimpleMenu.classes[tbl.parent:getClass()] ~= nil,
+                "Specified parent does not belong to any of registered classes"
+            )
+            self._parent = tbl._parent or nil
+        end
     end
 end
 
@@ -261,12 +274,78 @@ function Widget:getDescription()
     return self._description
 end
 
+function Widget:getID()
+    return self._id
+end
+
 function Widget:getName()
     return self._name
 end
 
 function Widget:getClass()
-    return self._type
+    return self._className
+end
+
+function Widget:addChild(child)
+    assertType(child, "Child instance", "table")
+    assert(
+        child.getClass and SimpleMenu.classes[child:getClass()] ~= nil,
+        "Specified child does not belong to any of registered classes."
+    )
+    assert(child._canParent, "Element of type " .. child:getClass() .. " can't be parented.")
+    assert(self._canBeParent, "Element of type " .. self:getClass() .. " can't be parented to.")
+    assert(self:getChildren()[child:getID()] == nil, "This element is already has this element as a child.")
+
+    if child._parent then
+        child._parent:removeChild(child)
+    end
+
+    if self._children == nil then
+        self._children = {}
+    end
+    self._children[child:getID()] = child
+    child._parent = self
+end
+
+function Widget:removeChild(child)
+    assertType(child, "Child instance", "table")
+    assert(
+        child.getClass and SimpleMenu.classes[child:getClass()] ~= nil,
+        "Specified child does not belong to any of registered classes."
+    )
+    if self._children[child:getID()] ~= nil then
+        self._children[child:getID()] = nil
+        child._parent = nil
+    end
+end
+
+function Widget:setParent(parent, ...)
+    assertType(parent, "Parent", { "table", "nil" })
+    if parent then
+        assert(
+            parent.getClass and SimpleMenu.classes[parent:getClass()] ~= nil,
+            "Specified parent does not belong to any of registered classes"
+        )
+        assert(self._canParent, "Element of type " .. self:getClass() .. " can't be parented.")
+        assert(parent._canBeParent, "Element of type " .. parent:getClass() .. " can't be parented to.")
+        assert(parent:getChildren()[self:getID()] == nil, "This element is already parented to this parent.")
+
+        if self._parent ~= nil then
+            self._parent:removeChild(self)
+        end
+
+        parent:addChild(self, ...)
+    else
+        self._parent:removeChild(self)
+    end
+end
+
+function Widget:getParent()
+    return self._parent
+end
+
+function Widget:getChildren()
+    return self._children
 end
 
 function Widget:renderGetTextWidth()
@@ -304,7 +383,7 @@ SimpleMenu.classes.Label = Label
 
 function Label:initialize(tbl)
     Widget.initialize(self, tbl)
-    self._type = "Label"
+    self._className = "Label"
 
     if tbl then
         assertType(tbl, "Table of arguments", "table")
@@ -384,7 +463,7 @@ local function menuInputHandler(pressed, key)
 
     local menuInputCode = menuInputs[key]
     local menu = menuStack[#menuStack]
-    local menuChildren = menu:getChildren()
+    local menuChildren = menu:getChildrenOrder()
     local cursorChild = menuChildren[cursor]
 
     if pressed == true then -- true for inputPressed hook
@@ -428,14 +507,15 @@ end
 
 function Menu:initialize(tbl)
     Label.initialize(self, tbl)
-    self._type = "Menu"
+    self._className = "Menu"
     self._pressable = true
     self._selectable = true
+    self._canBeParent = true
 
     if tbl then
         assertType(tbl, "Table of arguments", "table")
         assertType(tbl.text, "Text", { "string", "function", "nil" })
-        self._text = tbl.text and tbl.text or nil
+        self._text = tbl.text or nil
 
         assertType(tbl.children, "Children table", { "table", "nil" })
         assert(
@@ -443,7 +523,7 @@ function Menu:initialize(tbl)
                 if tbl.children == nil or table.isEmpty(tbl.children) then return true end
 
                 for _, child in ipairs(tbl.children) do
-                    if child.getType == nil or SimpleMenu.classes[child.getType()] == nil then
+                    if child.getClass == nil or SimpleMenu.classes[child.getClass()] == nil then
                         return false
                     end
                 end
@@ -453,17 +533,24 @@ function Menu:initialize(tbl)
             "One of specified children does not belong to any registered class"
         )
 
-        self._children = tbl.children and tbl.children or {}
+        self._children = {}
+        self._childrenOrder = {}
+        if tbl.children then
+            for i, child in ipairs(tbl.children) do
+                self.addChild(child, i)
+            end
+        end
     else
         self._text = nil
         self._children = {}
+        self._childrenOrder = {}
     end
 
     self._inputHandler = menuInputHandler
 end
 
 function Menu:press()
-    if #self._children > 0 then
+    if #self._childrenOrder > 0 then
         pushInputStack(self._inputHandler)
         tableInsert(menuStack, self)
         tableInsert(cursorStack, cursor)
@@ -489,17 +576,23 @@ function Menu:back()
 end
 
 function Menu:addChild(child, position)
-    assertType(child, "Child instance", "table")
     if position then
-        assertType(position, "Position", "number")
-        tableInsert(self._children, position, child)
+        assertType(position, "Child Order Position", "number")
+        table.insert(self._childrenOrder, mathClamp(position, 1, #self._childrenOrder + 1), child)
     else
-        tableInsert(self._children, child)
+        table.insert(self._childrenOrder, child)
     end
+
+    Label.addChild(self, child)
 end
 
-function Menu:getChildren()
-    return self._children
+function Menu:removeChild(child)
+    tableRemoveByValue(self._childrenOrder, child)
+    Label.removeChild(self, child)
+end
+
+function Menu:getChildrenOrder()
+    return self._childrenOrder
 end
 
 function Menu:renderGetTextWidth()
@@ -530,7 +623,7 @@ SimpleMenu.classes.Button = Button
 
 function Button:initialize(tbl)
     Label.initialize(self, tbl)
-    self._type = "Button"
+    self._className = "Button"
     self._pressable = true
     self._selectable = true
     self._pressed = false
@@ -691,7 +784,7 @@ end
 
 function Slider:initialize(tbl)
     Label.initialize(self, tbl)
-    self._type = "Slider"
+    self._className = "Slider"
     self._pressable = true
     self._selectable = true
     self._pressed = false
@@ -718,17 +811,11 @@ function Slider:initialize(tbl)
         if self._maxValue then value = mathMin(self._maxValue, value) end
         self._value = value
     else
-        self._precision = nil
-        self._minValue = nil
-        self._maxValue = nil
         self._step = 1
         self._value = 0
-        self._unit = nil
     end
 
-    self._valuetext = "[" ..
-        (self._precision and stringFormat("%.0" .. self._precision .. "f", self._value) or tostring(self._value))
-        .. " " .. (self._units or "") .. "]"
+    self._genValueText(self)
 
     self._inputHandler = sliderInputHandler
 end
@@ -736,7 +823,7 @@ end
 function Slider:_genValueText()
     self._valuetext = "[" ..
         (self._precision and stringFormat("%.0" .. self._precision .. "f", self._value) or tostring(self._value))
-        .. " " .. (self._units or "") .. "]"
+        .. (self._units and " " .. self._units or "") .. "]"
 end
 
 function Slider:setValue(value)
@@ -928,7 +1015,7 @@ end
 
 function KeyReader:initialize(tbl)
     Label.initialize(self, tbl)
-    self._type = "KeyReader"
+    self._className = "KeyReader"
     self._pressable = true
     self._selectable = true
     self._pressed = false
@@ -1059,7 +1146,6 @@ function KeyReader:render(pos, isSelected)
         )
     end
 
-    --print(self._value, inputENUMToKey[self._value])
     render.drawText(
         windowPosX + windowWidth, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
         "[" .. (self._value and inputENUMToKey[self._value] or " ") .. "]",
@@ -1078,17 +1164,18 @@ end
 --renders everything
 local function RenderMenu()
     local currentMenu = menuStack[#menuStack]
-
     if currentMenu == nil then return end
+
+    local currentMenuChildren = currentMenu:getChildrenOrder()
 
     render.setFont(font)
     _, fontHeight = render.getTextSize("TEST")
-    windowHeight = (fontHeight + rowPadding) * #currentMenu:getChildren()
+    windowHeight = (fontHeight + rowPadding) * #currentMenuChildren
     rowHeight = fontHeight + rowPadding
 
     windowWidth = windowMinWidth
 
-    for i, child in ipairs(currentMenu:getChildren()) do
+    for i, child in ipairs(currentMenuChildren) do
         windowWidth = mathMax(windowWidth, child:renderGetTextWidth())
     end
 
@@ -1103,7 +1190,7 @@ local function RenderMenu()
         windowHeight + windowMarginY * 2
     )
 
-    for i, child in ipairs(currentMenu:getChildren()) do
+    for i, child in ipairs(currentMenuChildren) do
         local isSelected = i == cursor and child:isSelectable()
         local pos = i - 1
 
@@ -1126,7 +1213,7 @@ local function mouseHandler(x, y)
     end
 
     local lastCursor = cursor
-    cursor = mathClamp(mathFloor((y - windowPosY) / rowHeight) + 1, 1, #menuStack[#menuStack]:getChildren())
+    cursor = mathClamp(mathFloor((y - windowPosY) / rowHeight) + 1, 1, #menuStack[#menuStack]:getChildrenOrder())
 
     if cursor ~= lastCursor then cursorLastChangeTime = curtime() end
 end
@@ -1162,12 +1249,20 @@ function SimpleMenu:setRoot(menuInstance)
     root = menuInstance
 end
 
-function SimpleMenu:createInstance(className, ...)
+function SimpleMenu:createInstance(className, argsTbl)
     assertType(className, "Class Name", "string")
+    assertType(argsTbl, "Argument Table", { "table", "nil" })
     assert(self.classes[className] ~= nil, "Class " .. className .. " doesn't exist")
 
-    local instance = self.classes[className]:new(...)
+    local instanceID = tostring(instanceIDCounter)
 
+    local args = argsTbl and argsTbl or {}
+    args.id = instanceID
+
+    local instance = self.classes[className]:new(args)
+    --instances[instanceID] = instance
+
+    instanceIDCounter = instanceIDCounter + 1
     return instance
 end
 
@@ -1206,8 +1301,8 @@ function SimpleMenu:Open(lockControls, enableCursor)
         if not input.canLockControls() then
             print(
                 "Can't lock controls yet. Please wait for " ..
-                mathRound(lastLockControl + 10 - curtime())
-                .. " seconds and try again. Blame Sparky for this 10 sec cooldown."
+                mathCeil(lastLockControl + 10 - curtime())
+                .. " seconds and try again.\nBlame Sparky for this 10 sec cooldown."
             )
             return
         else
