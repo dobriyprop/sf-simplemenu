@@ -580,9 +580,9 @@ do
         end
 
         self._inputHandlers = {}
-        for handler, inputHandler in pairs(inputHandlers) do
-            self._inputHandlers[handler] = function(...)
-                inputHandler(self, ...)
+        for handlerName, handlerFunc in pairs(inputHandlers) do
+            self._inputHandlers[handlerName] = function(...)
+                handlerFunc(self, ...)
             end
         end
     end
@@ -905,9 +905,9 @@ do
         self._genValueText(self)
 
         self._inputHandlers = {}
-        for handler, inputHandler in pairs(inputHandlers) do
-            self._inputHandlers[handler] = function(...)
-                inputHandler(self, ...)
+        for handlerName, handlerFunc in pairs(inputHandlers) do
+            self._inputHandlers[handlerName] = function(...)
+                handlerFunc(self, ...)
             end
         end
     end
@@ -1127,9 +1127,9 @@ do
         end
 
         self._inputHandlers = {}
-        for handler, inputHandler in pairs(inputHandlers) do
-            self._inputHandlers[handler] = function(...)
-                inputHandler(self, ...)
+        for handlerName, handlerFunc in pairs(inputHandlers) do
+            self._inputHandlers[handlerName] = function(...)
+                handlerFunc(self, ...)
             end
         end
     end
