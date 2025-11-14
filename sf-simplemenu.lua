@@ -217,14 +217,6 @@ local function popInputStack()
     return tableRemove(inputStack)
 end
 
-local function activateElement(Instance)
-    pushInputStack(Instance._inputHandlers)
-end
-
-local function deactivateElement(Instance)
-    popInputStack()
-end
-
 --classes
 
 --Base Widget
@@ -976,7 +968,7 @@ do
         self._pressed = true
         self._oldValue = self._value
 
-        activateElement(self)
+        pushInputStack(self._inputHandlers)
     end
 
     function Slider:change(direction)
@@ -999,7 +991,7 @@ do
 
         if self._onConfirm then self._onConfirm(self._value) end
 
-        deactivateElement()
+        popInputStack()
     end
 
     function Slider:cancel()
@@ -1009,7 +1001,7 @@ do
 
         self._genValueText(self)
 
-        deactivateElement()
+        popInputStack()
     end
 
     function Slider:onConfirm(func)
@@ -1160,7 +1152,7 @@ do
         if self._kbLockState == false then input.lockControls(true) end
         if self._mouseLockState == false then input.enableCursor(true) end
     ]]
-        activateElement(self)
+        pushInputStack(self._inputHandlers)
     end
 
     function KeyReader:confirm(key)
@@ -1171,7 +1163,7 @@ do
         if input.getCursorVisible() ~= self._mouseLockState then input.enableCursor(self._mouseLockState) end
     ]]
         if self._onConfirm then self._onConfirm(self._value) end
-        deactivateElement()
+        popInputStack()
     end
 
     function KeyReader:onConfirm(func)
