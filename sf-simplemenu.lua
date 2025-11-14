@@ -226,7 +226,6 @@ SimpleMenu.classes.Widget = Widget
 
 --initialize base widget
 function Widget:initialize(tbl)
-    self._className = "Widget"
     self._pressable = false
     self._selectable = false
     self._canParent = true
@@ -243,7 +242,7 @@ function Widget:initialize(tbl)
         assertType(tbl.parent, "Parent", { "table", "nil" })
         if tbl.parent then
             assert(
-                tbl.parent.getClass and SimpleMenu.classes[tbl.parent:getClass()] ~= nil,
+                tbl.parent.getClassName and SimpleMenu.classes[tbl.parent:getClassName()] ~= nil,
                 "Specified parent does not belong to any of registered classes"
             )
             self._parent = tbl._parent or nil
@@ -282,18 +281,18 @@ function Widget:getName()
     return self._name
 end
 
-function Widget:getClass()
-    return self._className
+function Widget:getClassName()
+    return self.class.name
 end
 
 function Widget:addChild(child)
     assertType(child, "Child instance", "table")
     assert(
-        child.getClass and SimpleMenu.classes[child:getClass()] ~= nil,
+        child.getClassName and SimpleMenu.classes[child:getClassName()] ~= nil,
         "Specified child does not belong to any of registered classes."
     )
-    assert(child._canParent, "Element of type " .. child:getClass() .. " can't be parented.")
-    assert(self._canBeParent, "Element of type " .. self:getClass() .. " can't be parented to.")
+    assert(child._canParent, "Element of type " .. child:getClassName() .. " can't be parented.")
+    assert(self._canBeParent, "Element of type " .. self:getClassName() .. " can't be parented to.")
     assert(self:getChildren()[child:getID()] == nil, "This element is already has this element as a child.")
 
     if child._parent then
@@ -310,7 +309,7 @@ end
 function Widget:removeChild(child)
     assertType(child, "Child instance", "table")
     assert(
-        child.getClass and SimpleMenu.classes[child:getClass()] ~= nil,
+        child.getClassName and SimpleMenu.classes[child:getClassName()] ~= nil,
         "Specified child does not belong to any of registered classes."
     )
     if self._children[child:getID()] ~= nil then
@@ -323,11 +322,11 @@ function Widget:setParent(parent, ...)
     assertType(parent, "Parent", { "table", "nil" })
     if parent then
         assert(
-            parent.getClass and SimpleMenu.classes[parent:getClass()] ~= nil,
+            parent.getClassName and SimpleMenu.classes[parent:getClassName()] ~= nil,
             "Specified parent does not belong to any of registered classes"
         )
-        assert(self._canParent, "Element of type " .. self:getClass() .. " can't be parented.")
-        assert(parent._canBeParent, "Element of type " .. parent:getClass() .. " can't be parented to.")
+        assert(self._canParent, "Element of type " .. self:getClassName() .. " can't be parented.")
+        assert(parent._canBeParent, "Element of type " .. parent:getClassName() .. " can't be parented to.")
         assert(parent:getChildren()[self:getID()] == nil, "This element is already parented to this parent.")
 
         if self._parent ~= nil then
@@ -383,7 +382,6 @@ SimpleMenu.classes.Label = Label
 
 function Label:initialize(tbl)
     Widget.initialize(self, tbl)
-    self._className = "Label"
 
     if tbl then
         assertType(tbl, "Table of arguments", "table")
@@ -507,7 +505,6 @@ end
 
 function Menu:initialize(tbl)
     Label.initialize(self, tbl)
-    self._className = "Menu"
     self._pressable = true
     self._selectable = true
     self._canBeParent = true
@@ -523,7 +520,7 @@ function Menu:initialize(tbl)
                 if tbl.children == nil or table.isEmpty(tbl.children) then return true end
 
                 for _, child in ipairs(tbl.children) do
-                    if child.getClass == nil or SimpleMenu.classes[child.getClass()] == nil then
+                    if child.getClassName == nil or SimpleMenu.classes[child:getClassName()] == nil then
                         return false
                     end
                 end
@@ -623,7 +620,6 @@ SimpleMenu.classes.Button = Button
 
 function Button:initialize(tbl)
     Label.initialize(self, tbl)
-    self._className = "Button"
     self._pressable = true
     self._selectable = true
     self._pressed = false
@@ -784,7 +780,6 @@ end
 
 function Slider:initialize(tbl)
     Label.initialize(self, tbl)
-    self._className = "Slider"
     self._pressable = true
     self._selectable = true
     self._pressed = false
@@ -1015,7 +1010,6 @@ end
 
 function KeyReader:initialize(tbl)
     Label.initialize(self, tbl)
-    self._className = "KeyReader"
     self._pressable = true
     self._selectable = true
     self._pressed = false
@@ -1244,8 +1238,7 @@ function SimpleMenu:setWindowMargins(x, y)
 end
 
 function SimpleMenu:setRoot(menuInstance)
-    assert(menuInstance:isInstanceOf(self.classes.Menu), "Instance is not of a \"Menu\" class")
-
+    assert(menuInstance.class == self.classes.Menu, "Instance is not of a \"Menu\" class")
     root = menuInstance
 end
 
