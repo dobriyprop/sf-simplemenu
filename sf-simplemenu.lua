@@ -573,10 +573,6 @@ function Menu:onPress(func)
     self._onPress = func
 end
 
-function Menu:release()
-    --placeholder
-end
-
 function Menu:back()
     popInputStack()
     tableRemove(menuStack)
