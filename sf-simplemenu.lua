@@ -101,11 +101,9 @@ local lastLockControl = 0
 local instanceIDCounter = 0
 --local instances = {}
 
-local cursor = 1
 local cursorLastChangeTime = 0
 local descriptionDelay = 2
 local autoRepeatAllowed = true
-local cursorStack = {}
 local menuStack = {}
 local inputStack = {}
 local activeElement = nil
@@ -469,15 +467,15 @@ do
 
         local menuInputCode = menuInputs[key]
         local menu = menuStack[#menuStack]
-        local menuChildren = menu:getOrder()
-        local cursorChild = menuChildren[cursor]
+        local menuChildren, _, _ = menu:getOrder()
+        local cursorChild = menuChildren[menu:getCursor()]
 
         if pressed == true then -- true for inputPressed hook
             if (menuInputCode == menuInputENUM.up or menuInputCode == menuInputENUM.down) and
                 not (menuInputState[menuInputENUM.enter] or menuInputState[menuInputENUM.back])
             then
                 local direction = menuInputCode == menuInputENUM.up and -1 or 1
-                local newCursor = cursor
+                local newCursor = menu:getCursor()
 
                 repeat
                     newCursor = newCursor + direction
@@ -487,7 +485,7 @@ do
                     menuChildren[newCursor]:isSelectable()
 
                 if (direction > 0 and newCursor <= #menuChildren) or (direction < 0 and newCursor >= 1) then
-                    cursor = newCursor
+                    menu:setCursor(newCursor)
                     cursorLastChangeTime = curtime()
                 end
             elseif menuInputCode == menuInputENUM.enter and cursorChild:isPressable() then
@@ -517,6 +515,7 @@ do
         self._pressable = true
         self._selectable = true
         self._canBeParent = true
+        self._cursor = 1
 
         if tbl then
             assertType(tbl, "Table of arguments", "table")
@@ -563,7 +562,6 @@ do
         if #self._order > 0 then
             pushInputStack(self._inputHandler)
             tableInsert(menuStack, self)
-            tableInsert(cursorStack, cursor)
             cursor = 1
 
             if self._onPress then self._onPress() end
@@ -578,7 +576,16 @@ do
     function Menu:back()
         popInputStack()
         tableRemove(menuStack)
-        cursor = tableRemove(cursorStack)
+    end
+
+    function Menu:setCursor(cursor)
+        assertType(cursor, "Cursor", "number")
+        self._cursor = mathClamp(cursor, 1, #self._order)
+        print(self._id, self._text, self._cursor)
+    end
+
+    function Menu:getCursor()
+        return self._cursor
     end
 
     function Menu:_genInverseOrder()
@@ -1239,7 +1246,7 @@ local function RenderMenu()
     )
 
     for i, child in ipairs(menuRenderOrder) do
-        local isSelected = menuOrderInverse[child] == cursor and child:isSelectable()
+        local isSelected = menuOrderInverse[child] == menu:getCursor() and child:isSelectable()
         local pos = menuOrderInverse[child] - 1
 
         child:render(pos, isSelected)
@@ -1260,10 +1267,11 @@ local function mouseHandler(x, y)
         return
     end
 
-    local lastCursor = cursor
-    cursor = mathClamp(mathFloor((y - windowPosY) / rowHeight) + 1, 1, #menuStack[#menuStack]:getOrder())
+    local menu = menuStack[#menuStack]
+    local lastCursor = menu:getCursor()
+    menu:setCursor(mathClamp(mathFloor((y - windowPosY) / rowHeight) + 1, 1, #menu:getOrder()))
 
-    if cursor ~= lastCursor then cursorLastChangeTime = curtime() end
+    if menu:getCursor() ~= lastCursor then cursorLastChangeTime = curtime() end
 end
 
 --sets font for menu
