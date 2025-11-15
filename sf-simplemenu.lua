@@ -250,25 +250,32 @@ do
         end
     end
 
+    ---@return boolean pressable True if this widget can be clicked/pressed
     function Widget:isPressable()
         return self._pressable
     end
 
+    ---@return boolean selectable True if this widget can be selected with arrow keys
     function Widget:isSelectable()
         return self._selectable
     end
 
+    ---@param name string? Optional name for this widget
+    ---@return nil
     function Widget:setName(name)
         assertType(name, "Name", { "string", "nil" })
         self._name = name
     end
 
+    ---@param desc string? Optional description for this widget. Will be shown in a tooltip
+    ---@return nil
     function Widget:setDescription(desc)
         assertType(desc, "Description", { "string", "nil" })
         assert(self._selectable, "Can't add description to unselectable element")
         self._description = desc
     end
 
+    ---@return string? desc Optional description for this widget
     function Widget:getDescription()
         return self._description
     end
@@ -277,6 +284,7 @@ do
         return self._id
     end
 
+    ---@return string? name Optional name for this widget
     function Widget:getName()
         return self._name
     end
@@ -285,6 +293,8 @@ do
         return self.class.name
     end
 
+    ---@param child Widget
+    ---@return nil
     function Widget:addChild(child)
         assertType(child, "Child instance", "table")
         assert(
@@ -306,6 +316,8 @@ do
         child._parent = self
     end
 
+    ---@param child Widget
+    ---@return nil
     function Widget:removeChild(child)
         assertType(child, "Child instance", "table")
         assert(
@@ -318,6 +330,9 @@ do
         end
     end
 
+    ---@param parent Widget Widget to parent to
+    ---@param ... unknown Anything that parent:addChild supports
+    ---@return nil
     function Widget:setParent(parent, ...)
         assertType(parent, "Parent", { "table", "nil" })
         if parent then
@@ -351,6 +366,9 @@ do
         return 0
     end
 
+    ---@param pos integer Position relative to parent
+    ---@param isSelected boolean Render as currently selected
+    ---@return nil
     function Widget:render(pos, isSelected)
         --sorry nothing
         --can be used as a spacer maybe
