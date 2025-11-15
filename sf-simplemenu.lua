@@ -509,7 +509,6 @@ do
                     cursorLastChangeTime = -1
                 elseif inputCode == inputENUM.back then
                     autoRepeatStop()
-                    cursor = 1
                     cursorLastChangeTime = -1
                     if instance == root then
                         SimpleMenu:Close()
@@ -601,7 +600,6 @@ do
         if #self._order > 0 then
             pushInputStack(self._inputHandlers)
             tableInsert(menuStack, self)
-            cursor = 1
 
             if self._onPress then self._onPress() end
         end
