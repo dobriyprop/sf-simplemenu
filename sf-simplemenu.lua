@@ -959,7 +959,7 @@ do
         assertType(minValue, "MinValue", { "number", "nil" })
         if minValue then
             self._minValue = minValue
-            self._value = mathMax(minValue, value)
+            self._value = mathMax(minValue, self._value)
         else
             self._minValue = nil
         end
@@ -970,7 +970,7 @@ do
         assertType(maxValue, "Value", { "number", "nil" })
         if maxValue then
             self._minValue = maxValue
-            self._value = mathMin(maxValue, value)
+            self._value = mathMin(maxValue, self._value)
         else
             self._minValue = nil
         end
@@ -1126,10 +1126,10 @@ do
         self._pressed = false
         if tbl then
             assertType(tbl, "Table of arguments", "table")
-            assertType(text, "Text", { "string", "function", "nil" })
+            assertType(tbl.text, "Text", { "string", "function", "nil" })
             self._text = (tbl and tbl.text) and tbl.text or nil
 
-            assertType(text, "Value", { "number", "nil" })
+            assertType(tbl.text, "Value", { "number", "nil" })
             self._value = (tbl and tbl.value) and tbl.value or nil
         else
             self._text = nil
