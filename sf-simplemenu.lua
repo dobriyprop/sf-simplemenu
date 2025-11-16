@@ -17,6 +17,8 @@ local stringFormat = string.format
 
 local curtime = timer.curtime
 
+local renderGetTextSize = render.getTextSize
+
 local kbMouseENUM = table.copy(KEY) --table of ENUMs to unify keyboard and mouse input codes
 --define mouse input codes
 kbMouseENUM.MOUSE1 = MOUSE.MOUSE1
@@ -64,11 +66,12 @@ local inputs = { --inputs map
     [kbMouseENUM.RIGHTARROW] = inputENUM.right,
     [kbMouseENUM.ENTER] = inputENUM.enter,
     [kbMouseENUM.BACKSPACE] = inputENUM.back,
-
     [kbMouseENUM.MOUSE1] = inputENUM.enter,
     [kbMouseENUM.MOUSE2] = inputENUM.back,
+    --[[
     [kbMouseENUM.MWHEELUP] = inputENUM.up,
     [kbMouseENUM.MWHEELDOWN] = inputENUM.down,
+    ]]
 }
 
 local inputsAutoRepeat = {
@@ -134,7 +137,7 @@ local function assertType(value, valueName, expectedTypes)
     if type(expectedTypes) == "string" then
         assert(
             type(value) == expectedTypes,
-            valueName .. " value should be \"" .. expectedTypes .. "\" type, not \"" .. type(value) .. "\""
+            valueName .. " should be \"" .. expectedTypes .. "\" type, not \"" .. type(value) .. "\""
         )
     elseif type(expectedTypes) == "table" then
         --builds expected types string from table and asserts incorrect entries in expected types table
@@ -144,7 +147,7 @@ local function assertType(value, valueName, expectedTypes)
                 type(expectedType) == "string",
                 "Assert type failed. Multiple expected types should be described as table of strings"
             )
-            expectedTypesString = expectedTypesString .. "\"expectedType\""
+            expectedTypesString = expectedTypesString .. "\"" .. expectedType .. "\""
             if i < #expectedTypes - 1 then
                 expectedTypesString = expectedTypesString .. ", "
             elseif i == #expectedTypes - 1 then
@@ -161,7 +164,7 @@ local function assertType(value, valueName, expectedTypes)
         --if no matches - create an assert
         assert(
             false,
-            valueName .. " value should be " .. expectedTypesString .. " type, not \"" .. type(value) .. "\""
+            valueName .. " should be " .. expectedTypesString .. " type, not \"" .. type(value) .. "\""
         )
     end
 end
@@ -227,18 +230,23 @@ do
     --initialize base widget
     function Widget:initialize(tbl)
         self._pressable = false
+        self._pressed = false
         self._selectable = false
         self._canParent = true
         self._canBeParent = false
 
         if tbl then
             assertType(tbl, "Table of arguments", "table")
+
             assertType(tbl.id, "ID", { "string" })
             self._id = tbl.id
+
             assertType(tbl.name, "Name", { "string", "nil" })
             self._name = tbl.name or nil
+
             assertType(tbl.description, "Description", { "string", "nil" })
             self._description = tbl.description or nil
+
             assertType(tbl.parent, "Parent", { "table", "nil" })
             if tbl.parent then
                 assert(
@@ -384,7 +392,7 @@ do
 
     function Widget:renderDescription(pos)
         if self._description == nil then return end
-        local textX, textY = render.getTextSize(self._description)
+        local textX, textY = renderGetTextSize(self._description)
         local descPosX = windowPosX + windowWidth + windowMarginX
         local descPosY = windowPosY + rowHeight * pos - windowMarginY + rowHeight * 0.5 - textY * 0.5
         render.setColor(COLORS.cursor)
@@ -404,6 +412,7 @@ do
 
         if tbl then
             assertType(tbl, "Table of arguments", "table")
+
             assertType(tbl.text, "Text", { "string", "function", "nil" })
             self._text = tbl.text and tbl.text or nil
         end
@@ -420,9 +429,7 @@ do
     end
 
     function Label:renderGetTextWidth()
-        local totalWidth = 0
-
-        totalWidth = totalWidth + Widget.renderGetTextWidth(self)
+        local totalWidth = Widget.renderGetTextWidth(self)
 
         if self._text then
             local text = self._text
@@ -432,7 +439,7 @@ do
                 assert(type(text) == "string", "Text function returned non string value")
             end
 
-            local width, _ = render.getTextSize(text)
+            local width, _ = renderGetTextSize(text)
             totalWidth = totalWidth + width
         end
 
@@ -442,8 +449,9 @@ do
     function Label:render(pos, isSelected)
         Widget.render(self, pos, isSelected)
 
-        if isSelected then
-            render.setColor(COLORS.cursor)
+        if self._pressed or isSelected then
+            local bgColor = self._pressed and COLORS.textBright or COLORS.cursor
+            render.setColor(bgColor)
             render.drawRect(
                 windowPosX - windowMarginX,
                 windowPosY + rowHeight * pos,
@@ -451,6 +459,7 @@ do
                 rowHeight
             )
         end
+
         if self._text then
             local text = self._text
 
@@ -459,7 +468,7 @@ do
                 assert(type(text) == "string", "Text function returned non string value")
             end
 
-            local textColor = isSelected and COLORS.textBright or COLORS.text
+            local textColor = self._pressed and COLORS.cursor or (isSelected and COLORS.textBright or COLORS.text)
             render.setColor(textColor)
             render.drawText(
                 windowPosX, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
@@ -552,6 +561,7 @@ do
 
         if tbl then
             assertType(tbl, "Table of arguments", "table")
+
             assertType(tbl.text, "Text", { "string", "function", "nil" })
             self._text = tbl.text or nil
 
@@ -689,10 +699,9 @@ do
     end
     ]]
     function Menu:renderGetTextWidth()
-        local totalWidth = render.getTextSize("\t")
+        local totalWidth = renderGetTextSize("\t") + Label.renderGetTextWidth(self)
 
-        totalWidth = totalWidth + Label.renderGetTextWidth(self)
-        local width, _ = render.getTextSize("->")
+        local width, _ = renderGetTextSize("->")
         totalWidth = totalWidth + width
 
         return totalWidth
@@ -700,6 +709,7 @@ do
 
     function Menu:render(pos, isSelected)
         Label.render(self, pos, isSelected)
+
         local textColor = isSelected and COLORS.textBright or COLORS.text
         render.setColor(textColor)
         render.drawText(
@@ -723,8 +733,10 @@ do
 
         if tbl then
             assertType(tbl, "Table of arguments", "table")
+
             assertType(tbl.value, "Text", { "string", "function", "nil" })
             self._text = tbl.text and tbl.text or nil
+
             assertType(tbl.value, "Value", { "string", "function", "nil" })
             self._value = tbl.value and tbl.value or nil
         else
@@ -761,23 +773,7 @@ do
     end
 
     function Button:renderGetTextWidth()
-        local totalWidth = render.getTextSize("\t")
-
-        if self._text then
-            local text = self._text
-
-            if type(self._text) == "function" then
-                text = self._text()
-                assert(type(text) == "string", "Text function returned non string value")
-            end
-
-            if type(self._text) ~= "string" then
-                text = tostring(text)
-            end
-
-            local width, _ = render.getTextSize(text)
-            totalWidth = totalWidth + width
-        end
+        local totalWidth = renderGetTextSize("\t") + Label.renderGetTextWidth(self)
 
         if self._value then
             local text = self._value
@@ -791,7 +787,7 @@ do
                 text = tostring(text)
             end
 
-            local width, _ = render.getTextSize(text)
+            local width, _ = renderGetTextSize(text)
             totalWidth = totalWidth + width
         end
 
@@ -799,38 +795,10 @@ do
     end
 
     function Button:render(pos, isSelected)
-        if self._pressed or isSelected then
-            local bgColor = self._pressed and COLORS.textBright or COLORS.cursor
-            render.setColor(bgColor)
-            render.drawRect(
-                windowPosX - windowMarginX,
-                windowPosY + rowHeight * pos,
-                windowWidth + windowMarginX * 2,
-                rowHeight
-            )
-        end
+        Label.render(self, pos, isSelected)
 
         local textColor = self._pressed and COLORS.cursor or (isSelected and COLORS.textBright or COLORS.text)
         render.setColor(textColor)
-
-        if self._text then
-            local text = self._text
-
-            if type(self._text) == "function" then
-                text = self._text()
-                assert(type(text) == "string", "Text function returned non string value")
-            end
-
-            if type(self._text) ~= "string" then
-                text = tostring(text)
-            end
-
-            render.drawText(
-                windowPosX, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
-                text,
-                TEXT_ALIGN.LEFT
-            )
-        end
 
         if self._value then
             local text = self._value
@@ -891,12 +859,16 @@ do
 
             assertType(tbl.precision, "Precision", { "number", "nil" })
             self._precision = tbl.precision or nil
+
             assertType(tbl.min, "Min Value", { "number", "nil" })
             self._minValue = tbl.min or nil
+
             assertType(tbl.max, "Mac Value", { "number", "nil" })
             self._maxValue = tbl.max or nil
+
             assertType(tbl.step, "Increment/Decrement Step", { "number", "nil" })
             self._step = tbl.step or 1
+
             assertType(tbl.units, "Units", { "string", "nil" })
             self._units = tbl.units or nil
 
@@ -1031,26 +1003,10 @@ do
     end
 
     function Slider:renderGetTextWidth()
-        local totalWidth = render.getTextSize("\t")
-
-        if self._text then
-            local text = self._text
-
-            if type(self._text) == "function" then
-                text = self._text()
-                assert(type(text) == "string", "Text function returned non string value")
-            end
-
-            if type(self._text) ~= "string" then
-                text = tostring(text)
-            end
-
-            local width, _ = render.getTextSize(text)
-            totalWidth = totalWidth + width
-        end
+        local totalWidth = renderGetTextSize("\t") + Label.renderGetTextWidth(self)
 
         if self._value then
-            local width, _ = render.getTextSize(self._valuetext)
+            local width, _ = renderGetTextSize(self._valuetext)
             totalWidth = totalWidth + width
         end
 
@@ -1058,38 +1014,7 @@ do
     end
 
     function Slider:render(pos, isSelected)
-        if self._pressed or isSelected then
-            local bgColor = self._pressed and COLORS.textBright or COLORS.cursor
-            render.setColor(bgColor)
-            render.drawRect(
-                windowPosX - windowMarginX,
-                windowPosY + rowHeight * pos,
-                windowWidth + windowMarginX * 2,
-                rowHeight
-            )
-        end
-
-        local textColor = self._pressed and COLORS.cursor or (isSelected and COLORS.textBright or COLORS.text)
-        render.setColor(textColor)
-
-        if self._text then
-            local text = self._text
-
-            if type(self._text) == "function" then
-                text = self._text()
-                assert(type(text) == "string", "Text function returned non string value")
-            end
-
-            if type(self._text) ~= "string" then
-                text = tostring(text)
-            end
-
-            render.drawText(
-                windowPosX, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
-                text,
-                TEXT_ALIGN.LEFT
-            )
-        end
+        Label.render(self, pos, isSelected)
 
         if self._value then
             render.drawText(
@@ -1124,11 +1049,12 @@ do
         self._pressed = false
         if tbl then
             assertType(tbl, "Table of arguments", "table")
+
             assertType(tbl.text, "Text", { "string", "function", "nil" })
             self._text = (tbl and tbl.text) and tbl.text or nil
 
-            assertType(tbl.text, "Value", { "number", "nil" })
-            self._value = (tbl and tbl.value) and tbl.value or nil
+            assertType(tbl.value, "Value", { "number", "nil" })
+            self._value = tbl.value or nil
         else
             self._text = nil
             self._value = nil
@@ -1188,7 +1114,7 @@ do
     end
 
     function KeyReader:renderGetTextWidth()
-        local totalWidth = render.getTextSize("\t")
+        local totalWidth = renderGetTextSize("\t")
 
         if self._text and not self._pressed then
             local text = self._text
@@ -1201,14 +1127,14 @@ do
             if type(self._text) ~= "string" then
                 text = tostring(text)
             end
-            local width, _ = render.getTextSize(text)
+            local width, _ = renderGetTextSize(text)
             totalWidth = totalWidth + width
         elseif self._pressed then
-            local width, _ = render.getTextSize("Press a key to assign")
+            local width, _ = renderGetTextSize("Press a key to assign")
             totalWidth = totalWidth + width
         end
 
-        local width, _ = render.getTextSize("[" .. (self._value and kbMouseENUMToKey[self._value] or " ") .. "]")
+        local width, _ = renderGetTextSize("[" .. (self._value and kbMouseENUMToKey[self._value] or " ") .. "]")
         totalWidth = totalWidth + width
 
         return totalWidth
@@ -1262,6 +1188,236 @@ do
     end
 end
 
+--Dropdown Menu
+---@class Dropdown : Label
+local Dropdown = class("Dropdown", Label)
+SimpleMenu.classes.Dropdown = Dropdown
+do
+    --handles inputs while in menus
+    local inputHandlers = {
+        keyboard = function(instance, pressed, key)
+            if inputs[key] == nil then return end
+
+            local inputCode = inputs[key]
+
+            if pressed == true then -- true for inputPressed hook
+                if (inputCode == inputENUM.up or inputCode == inputENUM.down) and
+                    not (inputState[inputENUM.enter] or inputState[inputENUM.back])
+                then
+                    local direction = inputCode == inputENUM.up and -1 or 1
+                    instance:setCursor(instance:getCursor() + direction)
+                elseif inputCode == inputENUM.enter then
+                    autoRepeatStop()
+                    instance:confirm()
+                elseif inputCode == inputENUM.back then
+                    autoRepeatStop()
+                    instance:cancel()
+                end
+            end
+        end,
+
+        mouse = function(instance, x, y)
+            if
+                x < instance._x or
+                x > instance._x + instance._w or
+                y < instance._y or
+                y > instance._y + instance._h
+            then
+                return
+            end
+
+            instance:setCursor(mathClamp(mathFloor((y - instance._y) / rowHeight) + 1, 1, #instance:getOptions()))
+        end,
+
+        controller = xinput and function(instance, pressed, button) end or nil,
+    }
+
+    function Dropdown:initialize(tbl)
+        Label.initialize(self, tbl)
+        self._pressable = true
+        self._selectable = true
+        self._canBeParent = false
+        self._cursor = 1
+
+        if tbl then
+            assertType(tbl, "Table of arguments", "table")
+
+            assertType(tbl.text, "Text", { "string", "function", "nil" })
+            self._text = tbl.text or nil
+
+            assertType(tbl.selected, "Selected Option", { "number", "nil" })
+            self._selected = tbl.selected or 1
+
+            assertType(tbl.options, "Options table", { "table", "nil" })
+            assert(
+                function()
+                    if tbl.options == nil or table.isEmpty(tbl.options) then return true end
+
+                    for i, option in ipairs(tbl.options) do
+                        assert(type(option) ~= "string", i .. " option is not a \"string\" type")
+                        return false
+                    end
+
+                    return true
+                end,
+                "One of specified children does not belong to any registered class"
+            )
+            self._options = tbl.options or nil
+        else
+            self._text = nil
+            self._selected = 1
+            self._options = {}
+        end
+
+        self._inputHandlers = {}
+        for handlerName, handlerFunc in pairs(inputHandlers) do
+            self._inputHandlers[handlerName] = function(...)
+                handlerFunc(self, ...)
+            end
+        end
+    end
+
+    function Dropdown:press()
+        if #self._options then
+            self._pressed = true
+            self._cursor = self._selected
+            pushInputStack(self._inputHandlers)
+        end
+    end
+
+    function Dropdown:confirm()
+        self._pressed = false
+        self._selected = self._cursor
+        if self._onConfirm then self._onConfirm(self._selected, self._options[self._selected]) end
+        popInputStack()
+    end
+
+    function Dropdown:onConfirm(func)
+        assertType(func, "On Confirm Function", { "function", "nil" })
+        self._onConfirm = func
+    end
+
+    function Dropdown:cancel()
+        self._pressed = false
+        popInputStack()
+    end
+
+    function Dropdown:setCursor(cursor)
+        assertType(cursor, "Cursor", "number")
+        self._cursor = mathClamp(cursor, 1, #self._options)
+    end
+
+    function Dropdown:getCursor()
+        return self._cursor
+    end
+
+    function Dropdown:setOptions(options)
+        assertType(options, "Options table", { "table", "nil" })
+        assert(
+            function()
+                if options == nil or table.isEmpty(options) then return true end
+
+                for i, option in ipairs(options) do
+                    assert(type(option) ~= "string", i .. " option is not a \"string\" type")
+                    return false
+                end
+
+                return true
+            end,
+            "One of specified children does not belong to any registered class"
+        )
+        self._options = options or nil
+    end
+
+    function Dropdown:addOption(child, position)
+        if position then
+            tableInsert(self._options, mathClamp(position, 1, #self._options + 1), child)
+        else
+            tableInsert(self._options, child)
+        end
+        self._genInverseOrder(self)
+    end
+
+    function Dropdown:removeOption(position)
+        tableRemove(self._options, position)
+        self.setCursor(self, self.getCursor(self))
+    end
+
+    function Dropdown:getOptions()
+        return self._options
+    end
+
+    function Dropdown:getSelected()
+        return self._selected
+    end
+
+    function Dropdown:renderGetTextWidth()
+        local totalWidth = renderGetTextSize("\t") + Label.renderGetTextWidth(self)
+
+        local width, _ = renderGetTextSize("[" .. self._options[self._selected] .. "]")
+        totalWidth = totalWidth + width
+
+        return totalWidth
+    end
+
+    function Dropdown:render(pos, isSelected)
+        Label.render(self, pos, isSelected)
+
+        local textColor = self._pressed and COLORS.cursor or (isSelected and COLORS.textBright or COLORS.text)
+        render.setColor(textColor)
+        render.drawText(
+            windowPosX + windowWidth, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
+            "[" .. self._options[self._selected] .. "]",
+            TEXT_ALIGN.RIGHT
+        )
+
+        if self._pressed then
+            local optionsWidth = 0
+
+            for _, option in ipairs(self._options) do
+                local width, _ = renderGetTextSize(option)
+                optionsWidth = mathMax(optionsWidth, width)
+            end
+
+            self._rowHeight = fontHeight + rowPadding
+            self._w = optionsWidth
+            self._h = self._rowHeight * #self._options
+            self._x = windowPosX + windowWidth * 0.5 - optionsWidth * 0.5
+            self._y = mathClamp(
+                windowPosY + windowMarginY + (self._rowHeight) * (pos + 1),
+                0, scrY - self._h - windowMarginY
+            )
+
+
+            render.setColor(COLORS.background)
+            render.drawRect(
+                self._x - windowMarginX,
+                self._y - windowMarginY,
+                self._w + windowMarginX * 2,
+                self._h + windowMarginY * 2
+            )
+
+            render.setColor(COLORS.cursor)
+            render.drawRect(
+                self._x - windowMarginX,
+                self._y + self._rowHeight * (self._cursor - 1),
+                self._w + windowMarginX * 2,
+                self._rowHeight
+            )
+
+            for i, option in ipairs(self._options) do
+                local textColor = i == self._cursor and COLORS.textBright or COLORS.text
+                render.setColor(textColor)
+                render.drawText(
+                    self._x + optionsWidth * 0.5, self._y + self._rowHeight * (i - 1) + rowPadding * 0.5,
+                    option,
+                    TEXT_ALIGN.CENTER
+                )
+            end
+        end
+    end
+end
+
 --gets players display resolution and center
 local function InitDisplay()
     scrX, scrY = render.getGameResolution()
@@ -1278,7 +1434,7 @@ local function RenderMenu()
     local menuOrder, menuOrderInverse, menuRenderOrder = menu:getOrder()
 
     render.setFont(font)
-    _, fontHeight = render.getTextSize("TEST")
+    _, fontHeight = renderGetTextSize("TEST")
     windowHeight = (fontHeight + rowPadding) * #menuOrder
     rowHeight = fontHeight + rowPadding
 
@@ -1309,25 +1465,7 @@ local function RenderMenu()
         end
     end
 end
---[[
-local function mouseHandler(x, y)
-    if
-        x < windowPosX or
-        x > windowPosX + windowWidth or
-        y < windowPosY or
-        y > windowPosY + windowHeight
-    then
-        cursorLastChangeTime = -1
-        return
-    end
 
-    local menu = menuStack[#menuStack]
-    local lastCursor = menu:getCursor()
-    menu:setCursor(mathClamp(mathFloor((y - windowPosY) / rowHeight) + 1, 1, #menu:getOrder()))
-
-    if menu:getCursor() ~= lastCursor then cursorLastChangeTime = curtime() end
-end
- ]]
 --sets font for menu
 function SimpleMenu:setFont(newFont)
     assertType(newFont, "Font", "string")

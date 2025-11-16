@@ -3,10 +3,15 @@
 --@client
 
 --@include sf-simplemenu.lua
+
+local menuFont = render.createFont("Default", 20, 500, true, false, false, false, 0, false, 0)
+
 local simpleMenu = require("sf-simplemenu.lua")
 
-simpleMenu:setWindowMargins(4, 0)
+simpleMenu:setWindowMargins(4, 4)
 simpleMenu:setRowPadding(4)
+simpleMenu:setFont(menuFont)
+simpleMenu:setDescriptionDelay(1)
 
 local mainMenu = simpleMenu:createInstance("Menu")
 simpleMenu:setRoot(mainMenu)
@@ -75,5 +80,12 @@ local keyReader = simpleMenu:createInstance("KeyReader", { text = "Key Reader Te
 keyReader:onConfirm(function(value) print("On Confirm:", value) end)
 mainMenu:addChild(keyReader)
 
+local dropDown = simpleMenu:createInstance("Dropdown", {
+    text = "Dropdown Menu Test",
+    options = { "Option 1", "Option 2", "Option 3", "Option 4" },
+})
+dropDown:onConfirm(function(optionNumber, optionName) print("On Confirm:", optionNumber, optionName) end)
+dropDown:setParent(mainMenu)
+
 enableHud(_, true)
-simpleMenu:Open(true, false)
+simpleMenu:Open(true, true)
