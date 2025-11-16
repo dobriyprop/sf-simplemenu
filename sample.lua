@@ -13,6 +13,7 @@ simpleMenu:setRowPadding(4)
 simpleMenu:setFont(menuFont)
 simpleMenu:setDescriptionDelay(1)
 
+--Menu usage examples
 local mainMenu = simpleMenu:createInstance("Menu")
 simpleMenu:setRoot(mainMenu)
 
@@ -24,6 +25,11 @@ local staticLabels = simpleMenu:createInstance("Menu")
 staticLabels:setText("Static Labels")
 mainMenu:addChild(staticLabels)
 
+local buttons = simpleMenu:createInstance("Menu")
+buttons:setText("Buttons")
+mainMenu:addChild(buttons)
+
+--Labels examples
 for i = 1, 50 do
     local label = simpleMenu:createInstance("Label")
     label:setText("Label " .. i)
@@ -40,10 +46,7 @@ for j = 1, 10 do
     dynamicLabels:addChild(label)
 end
 
-local buttons = simpleMenu:createInstance("Menu")
-buttons:setText("Buttons")
-mainMenu:addChild(buttons)
-
+--Buttons usage examples
 local printButton = simpleMenu:createInstance("Button")
 printButton:setText("Print \"Hello World!\"")
 printButton:onPress(function() print("Hello World!") end)
@@ -62,6 +65,7 @@ toggleButton:setValue(function() return "[" .. (toggleValue and "ON" or "OFF") .
 toggleButton:onPress(function() toggleValue = not toggleValue end)
 buttons:addChild(toggleButton)
 
+--Slider example
 local slider = simpleMenu:createInstance("Slider",
     {
         text = "Slider test",
@@ -76,10 +80,12 @@ slider:onChange(function(value) print("On Change:", value) end)
 slider:onConfirm(function(value) print("On Confirm:", value) end)
 mainMenu:addChild(slider)
 
+--Key Reader example
 local keyReader = simpleMenu:createInstance("KeyReader", { text = "Key Reader Test" })
 keyReader:onConfirm(function(value) print("On Confirm:", value) end)
 mainMenu:addChild(keyReader)
 
+--Dropdown menu example
 local dropDown = simpleMenu:createInstance("Dropdown", {
     text = "Dropdown Menu Test",
     options = { "Option 1", "Option 2", "Option 3", "Option 4" },
