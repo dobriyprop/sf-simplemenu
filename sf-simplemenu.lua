@@ -52,6 +52,23 @@ local inputENUM = { --ENUMs for menu actions
     back = 6,
 }
 
+local xinputENUM = {
+    Up    = 0x0001,
+    Down  = 0x0002,
+    Left  = 0x0004,
+    Right = 0x0008,
+    Start = 0x0010,
+    View  = 0x0020,
+    LS    = 0x0040,
+    RS    = 0x0080,
+    LB    = 0x0100,
+    RB    = 0x0200,
+    A     = 0x1000,
+    B     = 0x2000,
+    X     = 0x4000,
+    Y     = 0x8000,
+}
+
 local inputs = { --inputs map
     [kbMouseENUM.W] = inputENUM.up,
     [kbMouseENUM.S] = inputENUM.down,
@@ -68,10 +85,19 @@ local inputs = { --inputs map
     [kbMouseENUM.BACKSPACE] = inputENUM.back,
     [kbMouseENUM.MOUSE1] = inputENUM.enter,
     [kbMouseENUM.MOUSE2] = inputENUM.back,
-    --[[
+
     [kbMouseENUM.MWHEELUP] = inputENUM.up,
     [kbMouseENUM.MWHEELDOWN] = inputENUM.down,
-    ]]
+
+}
+
+local xinputs = {
+    [xinputENUM.Up] = inputENUM.up,
+    [xinputENUM.Down] = inputENUM.down,
+    [xinputENUM.Left] = inputENUM.left,
+    [xinputENUM.Right] = inputENUM.right,
+    [xinputENUM.A] = inputENUM.enter,
+    [xinputENUM.B] = inputENUM.back,
 }
 
 local inputsAutoRepeat = {
@@ -190,6 +216,34 @@ local function keyboardHandler(pressed, key)
 
         --if input is pressed and and auto repeat is allowed and menu input action is allowed to be autorepeated
         if pressed == true and autoRepeat == true and inputsAutoRepeat[inputs[key]] == true then
+            --create autorepeat delay timer for X seconds (0.5 in this case, make it adjustable later)
+            timer.create("autorepeat_delay", 0.5, 1, function()
+                --after which autorepeat timer will start and spam last performed input Y seconds
+                --(0.03 in this case, also make it adjustable later)
+                timer.create("autorepeat", 0.02, 0, function()
+                    if inputFunc then inputFunc(pressed, key) end
+                end)
+            end)
+        end
+
+        if inputFunc then inputFunc(pressed, key) end
+    end
+end
+
+local function xinputHandler(pressed, key)
+    if xinputs[key] then
+        inputState[xinputs[key]] = pressed
+    end
+    --if new input arrived be it on press or release - stop all autorepeat timers
+    autoRepeatStop()
+
+    --check if input stack is valid table and not empty
+    if inputStack and not table.isEmpty(inputStack) then
+        --perform an input action according to pressed keys
+        local inputFunc = inputStack[#inputStack].controller
+
+        --if input is pressed and and auto repeat is allowed and menu input action is allowed to be autorepeated
+        if pressed == true and autoRepeat == true and inputsAutoRepeat[xinputs[key]] == true then
             --create autorepeat delay timer for X seconds (0.5 in this case, make it adjustable later)
             timer.create("autorepeat_delay", 0.5, 1, function()
                 --after which autorepeat timer will start and spam last performed input Y seconds
@@ -494,6 +548,8 @@ do
             local selectedChild = instanceChildren[instance:getCursor()]
 
             if pressed == true then -- true for inputPressed hook
+                --[[ print(inputCode == inputENUM.up and "up", inputCode == inputENUM.down and "down",
+                    inputState[inputENUM.enter] and "enter held", inputState[inputENUM.back] and "enter held") ]]
                 if (inputCode == inputENUM.up or inputCode == inputENUM.down) and
                     not (inputState[inputENUM.enter] or inputState[inputENUM.back])
                 then
@@ -549,7 +605,53 @@ do
             if instance:getCursor() ~= lastCursor then cursorLastChangeTime = curtime() end
         end,
 
-        controller = xinput and function(instance, pressed, button) end or nil,
+        controller = xinput and function(instance, pressed, key)
+            if xinputs[key] == nil then return end
+
+            local inputCode = xinputs[key]
+            local instanceChildren, _, _ = instance:getOrder()
+            local selectedChild = instanceChildren[instance:getCursor()]
+
+            if pressed == true then -- true for inputPressed hook
+                --[[ print(inputCode == inputENUM.up and "up", inputCode == inputENUM.down and "down",
+                    inputState[inputENUM.enter] and "enter held", inputState[inputENUM.back] and "enter held") ]]
+                if (inputCode == inputENUM.up or inputCode == inputENUM.down) and
+                    not (inputState[inputENUM.enter] or inputState[inputENUM.back])
+                then
+                    local direction = inputCode == inputENUM.up and -1 or 1
+                    local newCursor = instance:getCursor()
+
+                    repeat
+                        newCursor = newCursor + direction
+                    until
+                        (direction > 0 and newCursor > #instanceChildren) or
+                        (direction < 0 and newCursor < 1) or
+                        instanceChildren[newCursor]:isSelectable()
+
+                    if (direction > 0 and newCursor <= #instanceChildren) or (direction < 0 and newCursor >= 1) then
+                        instance:setCursor(newCursor)
+                        cursorLastChangeTime = curtime()
+                    end
+                elseif inputCode == inputENUM.enter and selectedChild:isPressable() then
+                    autoRepeatStop()
+                    instance:moveDownRenderOrder(selectedChild)
+                    selectedChild:press()
+                    cursorLastChangeTime = -1
+                elseif inputCode == inputENUM.back then
+                    autoRepeatStop()
+                    cursorLastChangeTime = -1
+                    if instance == root then
+                        SimpleMenu:Close()
+                    else
+                        instance:back()
+                    end
+                end
+            elseif pressed == false then -- false for inputReleased hook
+                if inputCode == inputENUM.enter and selectedChild:isPressable() then
+                    selectedChild:release()
+                end
+            end
+        end or nil,
     }
 
     function Menu:initialize(tbl)
@@ -845,7 +947,23 @@ do
             end
         end,
         mouse = function(instance, x, y) end,
-        controller = xinput and function(instance, pressed, button) end or nil,
+        controller = xinput and function(instance, pressed, key)
+            if xinputs[key] == nil then return end
+
+            local menuInputCode = xinputs[key]
+
+            if pressed == true then -- true for inputPressed hook
+                if menuInputCode == inputENUM.up or menuInputCode == inputENUM.down then
+                    instance:change(menuInputCode == inputENUM.up)
+                elseif menuInputCode == inputENUM.enter then
+                    autoRepeatStop()
+                    instance:confirm()
+                elseif menuInputCode == inputENUM.back then
+                    autoRepeatStop()
+                    instance:cancel()
+                end
+            end
+        end or nil,
     }
 
     function Slider:initialize(tbl)
@@ -1229,7 +1347,26 @@ do
             instance:setCursor(mathClamp(mathFloor((y - instance._y) / rowHeight) + 1, 1, #instance:getOptions()))
         end,
 
-        controller = xinput and function(instance, pressed, button) end or nil,
+        controller = xinput and function(instance, pressed, key)
+            if xinputs[key] == nil then return end
+
+            local inputCode = xinputs[key]
+
+            if pressed == true then -- true for inputPressed hook
+                if (inputCode == inputENUM.up or inputCode == inputENUM.down) and
+                    not (inputState[inputENUM.enter] or inputState[inputENUM.back])
+                then
+                    local direction = inputCode == inputENUM.up and -1 or 1
+                    instance:setCursor(instance:getCursor() + direction)
+                elseif inputCode == inputENUM.enter then
+                    autoRepeatStop()
+                    instance:confirm()
+                elseif inputCode == inputENUM.back then
+                    autoRepeatStop()
+                    instance:cancel()
+                end
+            end
+        end or nil,
     }
 
     function Dropdown:initialize(tbl)
@@ -1581,23 +1718,32 @@ function SimpleMenu:Open(lockControls, enableCursor)
 
     hook.add("drawhud", "SimpleMenu Render", RenderMenu)
 
-    hook.add("inputPressed", "SimpleMenu Input Read", function(key)
-        keyboardHandler(true, key)
-    end)
+    hook.add("inputPressed", "SimpleMenu Keyboard Input Read", function(key) keyboardHandler(true, key) end)
 
-    hook.add("inputReleased", "SimpleMenu Input Read", function(key)
+    hook.add("inputReleased", "SimpleMenu Keyboard Input Read", function(key)
         keyboardHandler(false, key)
     end)
+
+    if xinput then
+        hook.add("XInputPressed", "SimpleMenu Xinput Input Read", function(_, key, _) xinputHandler(true, key) end)
+
+        hook.add("XInputReleased", "SimpleMenu Xinput Input Read", function(_, key, _) xinputHandler(false, key) end)
+    end
 end
 
 --closes menu window
 function SimpleMenu:Close()
     input.enableCursor(false)
     input.lockControls(false)
+
     hook.remove("drawhud", "SimpleMenu Render")
-    hook.remove("inputPressed", "SimpleMenu Input Read")
-    hook.remove("inputReleased", "SimpleMenu Input Read")
+    hook.remove("inputPressed", "SimpleMenu Keyboard Input Read")
+    hook.remove("inputReleased", "SimpleMenu Keyboard Input Read")
     hook.remove("think", "SimpleMenu Mouse Read")
+
+    for key, _ in pairs(inputState) do
+        inputState[key] = false
+    end
 
     if SimpleMenu.onClose then SimpleMenu.onClose() end
 end
