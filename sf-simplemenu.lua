@@ -69,6 +69,8 @@ local xinputENUM = {
     Y     = 0x8000,
 }
 
+local xinputENUMToKey = inverseTable(xinputENUM)
+
 local inputs = { --inputs map
     [kbMouseENUM.W] = inputENUM.up,
     [kbMouseENUM.S] = inputENUM.down,
@@ -1157,7 +1159,7 @@ do
             end
         end,
         mouse = nil,
-        controller = xinput and function(instance, pressed, button) end or nil,
+        controller = nil,
     }
 
     function KeyReader:initialize(tbl)
@@ -1301,6 +1303,168 @@ do
         render.drawText(
             windowPosX + windowWidth, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
             "[" .. (self._value and kbMouseENUMToKey[self._value] or " ") .. "]",
+            TEXT_ALIGN.RIGHT
+        )
+    end
+end
+
+--xinput Key reader
+---@class XinputKeyReader : Label
+local XinputKeyReader = class("XinputKeyReader", Label)
+SimpleMenu.classes.XinputKeyReader = XinputKeyReader
+do
+    local inputHandlers = {
+        keyboard = nil,
+        mouse = nil,
+        controller = xinput and function(instance, pressed, key)
+            if pressed == true then
+                autoRepeatStop()
+                instance:confirm(key)
+            end
+        end or nil,
+    }
+
+    function XinputKeyReader:initialize(tbl)
+        Label.initialize(self, tbl)
+        self._pressable = true
+        self._selectable = true
+        self._pressed = false
+        if tbl then
+            assertType(tbl, "Table of arguments", "table")
+
+            assertType(tbl.text, "Text", { "string", "function", "nil" })
+            self._text = (tbl and tbl.text) and tbl.text or nil
+
+            assertType(tbl.value, "Value", { "number", "nil" })
+            self._value = tbl.value or nil
+        else
+            self._text = nil
+            self._value = nil
+        end
+
+        self._inputHandlers = {}
+        for handlerName, handlerFunc in pairs(inputHandlers) do
+            self._inputHandlers[handlerName] = function(...)
+                handlerFunc(self, ...)
+            end
+        end
+    end
+
+    function XinputKeyReader:setValue(value)
+        assertType(value, "Value", { "string", "number", "nil" })
+
+        if type(value) == string then
+            assert(xinputENUM[value] ~= nil, "Unknown key name specified")
+            self._value = xinputENUM[value]
+        else
+            self._value = value
+        end
+    end
+
+    function XinputKeyReader:getValue()
+        return self._value, xinputENUM[self._value]
+    end
+
+    function XinputKeyReader:press()
+        self._pressed = true
+        --[[
+        if not input.canLockControls() then return end
+
+        self._kbLockState = input.isControlLocked()
+        self._mouseLockState = input.getCursorVisible()
+
+        if self._kbLockState == false then input.lockControls(true) end
+        if self._mouseLockState == false then input.enableCursor(true) end
+    ]]
+        pushInputStack(self._inputHandlers)
+    end
+
+    function XinputKeyReader:confirm(key)
+        self._pressed = false
+        self._value = key
+        --[[
+        if input.isControlLocked() ~= self._kbLockState then input.lockControls(self._kbLockState) end
+        if input.getCursorVisible() ~= self._mouseLockState then input.enableCursor(self._mouseLockState) end
+    ]]
+        if self._onConfirm then self._onConfirm(self._value) end
+        popInputStack()
+    end
+
+    function XinputKeyReader:onConfirm(func)
+        assertType(func, "On Confirm Function", { "function", "nil" })
+        self._onConfirm = func
+    end
+
+    function XinputKeyReader:renderGetTextWidth()
+        local totalWidth = renderGetTextSize("\t")
+
+        if self._text and not self._pressed then
+            local text = self._text
+
+            if type(self._text) == "function" then
+                text = self._text()
+                assert(type(text) == "string", "Text function returned non string value")
+            end
+
+            if type(self._text) ~= "string" then
+                text = tostring(text)
+            end
+            local width, _ = renderGetTextSize(text)
+            totalWidth = totalWidth + width
+        elseif self._pressed then
+            local width, _ = renderGetTextSize("Press a key to assign")
+            totalWidth = totalWidth + width
+        end
+
+        local width, _ = renderGetTextSize("[" .. (self._value and xinputENUMToKey[self._value] or " ") .. "]")
+        totalWidth = totalWidth + width
+
+        return totalWidth
+    end
+
+    function XinputKeyReader:render(pos, isSelected)
+        if self._pressed or isSelected then
+            local bgColor = self._pressed and COLORS.textBright or COLORS.cursor
+            render.setColor(bgColor)
+            render.drawRect(
+                windowPosX - windowMarginX,
+                windowPosY + rowHeight * pos,
+                windowWidth + windowMarginX * 2,
+                rowHeight
+            )
+        end
+
+        local textColor = self._pressed and COLORS.cursor or (isSelected and COLORS.textBright or COLORS.text)
+        render.setColor(textColor)
+
+        if self._text and not self._pressed then
+            local text = self._text
+
+            if type(self._text) == "function" then
+                text = self._text()
+                assert(type(text) == "string", "Text function returned non string value")
+            end
+
+            if type(self._text) ~= "string" then
+                text = tostring(text)
+            end
+
+            render.drawText(
+                windowPosX, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
+                text,
+                TEXT_ALIGN.LEFT
+            )
+        elseif self._pressed then
+            render.drawText(
+                windowPosX, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
+                "Press a key to assign",
+                TEXT_ALIGN.LEFT
+            )
+        end
+
+        render.drawText(
+            windowPosX + windowWidth, windowPosY + (fontHeight + rowPadding) * pos + rowPadding * 0.5,
+            "[" .. (self._value and xinputENUMToKey[self._value] or " ") .. "]",
             TEXT_ALIGN.RIGHT
         )
     end
@@ -1739,6 +1903,10 @@ function SimpleMenu:Close()
     hook.remove("drawhud", "SimpleMenu Render")
     hook.remove("inputPressed", "SimpleMenu Keyboard Input Read")
     hook.remove("inputReleased", "SimpleMenu Keyboard Input Read")
+    if xinput then
+        hook.remove("XInputPressed", "SimpleMenu Xinput Input Read")
+        hook.remove("XInputReleased", "SimpleMenu Xinput Input Read")
+    end
     hook.remove("think", "SimpleMenu Mouse Read")
 
     for key, _ in pairs(inputState) do
